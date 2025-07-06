@@ -32,6 +32,7 @@ import LiveAuction from './components/LiveAuction';
 import '@suiet/wallet-kit/style.css'; // Default SUI Wallet Kit CSS
 import './suiet-wallet-kit-custom.css'; // Custom CSS
 
+const isMaintenance = 0; // Set to 1 to enable maintenance mode
 // GraphQL Queries
 const FETCH_COLLECTIONS = gql`
   query fetchCollectionInfo($slug: String) {
@@ -155,6 +156,36 @@ function App() {
   const [selectedCollection, setSelectedCollection] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  if (isMaintenance === 1) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Container maxWidth="sm">
+            <Alert 
+              severity="warning" 
+              sx={{ 
+                bgcolor: 'background.paper',
+                p: 3,
+                textAlign: 'center',
+                borderRadius: 2,
+                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+              }}
+            >
+              <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: 'primary.main' }}>
+                System Maintenance
+              </Typography>
+              <Typography variant="body1" sx={{ color: 'text.primary' }}>
+                Lofita Auction is currently undergoing scheduled maintenance. 
+                We'll be back online soon. Thank you for your patience!
+              </Typography>
+            </Alert>
+          </Container>
+        </Box>
+      </ThemeProvider>
+    );
+  }
 
   const themeInstance = useTheme();
   const isMobile = useMediaQuery(themeInstance.breakpoints.down('md'));
