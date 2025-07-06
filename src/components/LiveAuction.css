@@ -1,0 +1,112 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.live-auction-frame {
+  max-width: 1000px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 77, 166, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 0, 122, 0.3);
+  color: #F8FAFC;
+  font-family: 'Inter', 'Poppins', sans-serif;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.auctions-table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0.75rem;
+  border: 1px solid #FF4DA6;
+  overflow: hidden;
+  table-layout: fixed;
+}
+
+.auctions-table th,
+.auctions-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.9rem;
+  border-bottom: 1px solid rgba(255, 77, 166, 0.2);
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.auctions-table th {
+  background: rgba(255, 77, 166, 0.1);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #FF4DA6;
+}
+
+.completed-auctions .auctions-table th:nth-child(1),
+.completed-auctions .auctions-table td:nth-child(1) { width: 20%; } /* NFT Name */
+.completed-auctions .auctions-table th:nth-child(2),
+.completed-auctions .auctions-table td:nth-child(2) { width: 20%; } /* Token ID */
+.completed-auctions .auctions-table th:nth-child(3),
+.completed-auctions .auctions-table td:nth-child(3) { width: 20%; } /* Seller */
+.completed-auctions .auctions-table th:nth-child(4),
+.completed-auctions .auctions-table td:nth-child(4) { width: 15%; } /* Final Bid */
+.completed-auctions .auctions-table th:nth-child(5),
+.completed-auctions .auctions-table td:nth-child(5) { width: 15%; } /* Winner */
+.completed-auctions .auctions-table th:nth-child(6),
+.completed-auctions .auctions-table td:nth-child(6) { width: 20%; } /* End Time */
+
+.auctions-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.auctions-table tbody tr:hover {
+  background: rgba(255, 77, 166, 0.1);
+  transition: background 0.2s ease;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Desktop-specific adjustments */
+@media (min-width: 769px) {
+  .live-auction-frame {
+    padding: 1.5rem;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .live-auction-frame {
+    margin: 1rem;
+    padding: 1rem;
+  }
+
+  .auctions-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .auctions-table th,
+  .auctions-table td {
+    padding: 0.5rem 0.6rem;
+    font-size: 0.85rem;
+  }
+}

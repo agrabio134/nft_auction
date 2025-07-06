@@ -1,0 +1,8 @@
+[package]
+name = "lofita_yeti_auction"
+version = "0.0.1"
+
+[dependencies]
+
+[addresses]
+lofita_yeti_auction = "0x0"

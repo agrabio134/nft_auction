@@ -1,0 +1,365 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.admin-view-container {
+  max-width: 1000px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 77, 166, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 0, 122, 0.3);
+  color: #f8fafc;
+  font-family: "Inter", "Poppins", sans-serif;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.admin-view-container h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #ff007a;
+  letter-spacing: 0.03em;
+}
+
+.auctions-table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0.75rem;
+  border: 1px solid #ff4da6;
+  overflow: hidden;
+}
+
+.auctions-table th,
+.auctions-table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.9rem;
+  border-bottom: 1px solid rgba(255, 77, 166, 0.2);
+}
+
+.auctions-table th {
+  background: rgba(255, 77, 166, 0.1);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #ff4da6;
+}
+
+/* Prevent address fields from shrinking */
+.auctions-table td:nth-child(1),
+.auctions-table td:nth-child(2),
+.active-auction .auctions-table td:nth-child(5),
+.completed-auctions .auctions-table td:nth-child(4) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Active Auction table column widths */
+.active-auction .auctions-table th:nth-child(1),
+.active-auction .auctions-table td:nth-child(1) {
+  min-width: 120px;
+} /* Token ID */
+.active-auction .auctions-table th:nth-child(2),
+.active-auction .auctions-table td:nth-child(2) {
+  min-width: 120px;
+} /* Seller */
+.active-auction .auctions-table th:nth-child(3),
+.active-auction .auctions-table td:nth-child(3) {
+  min-width: 100px;
+} /* Starting Bid */
+.active-auction .auctions-table th:nth-child(4),
+.active-auction .auctions-table td:nth-child(4) {
+  min-width: 100px;
+} /* Current Bid */
+.active-auction .auctions-table th:nth-child(5),
+.active-auction .auctions-table td:nth-child(5) {
+  min-width: 120px;
+} /* Highest Bidder */
+.active-auction .auctions-table th:nth-child(6),
+.active-auction .auctions-table td:nth-child(6) {
+  min-width: 100px;
+} /* Time Left */
+.active-auction .auctions-table th:nth-child(7),
+.active-auction .auctions-table td:nth-child(7) {
+  min-width: 150px;
+} /* Actions */
+
+/* Queued Auctions and Pending/Canceled/Rejected table column widths */
+.queued-auctions .auctions-table th:nth-child(1),
+.queued-auctions .auctions-table td:nth-child(1),
+.pending-canceled-rejected .auctions-table th:nth-child(1),
+.pending-canceled-rejected .auctions-table td:nth-child(1) {
+  min-width: 120px;
+} /* Token ID */
+.queued-auctions .auctions-table th:nth-child(2),
+.queued-auctions .auctions-table td:nth-child(2),
+.pending-canceled-rejected .auctions-table th:nth-child(2),
+.pending-canceled-rejected .auctions-table td:nth-child(2) {
+  min-width: 120px;
+} /* Seller */
+.queued-auctions .auctions-table th:nth-child(3),
+.queued-auctions .auctions-table td:nth-child(3),
+.pending-canceled-rejected .auctions-table th:nth-child(3),
+.pending-canceled-rejected .auctions-table td:nth-child(3) {
+  min-width: 100px;
+} /* Starting Bid */
+.queued-auctions .auctions-table th:nth-child(4),
+.queued-auctions .auctions-table td:nth-child(4),
+.pending-canceled-rejected .auctions-table th:nth-child(4),
+.pending-canceled-rejected .auctions-table td:nth-child(4) {
+  min-width: 100px;
+} /* Duration */
+.queued-auctions .auctions-table th:nth-child(5),
+.queued-auctions .auctions-table td:nth-child(5),
+.pending-canceled-rejected .auctions-table th:nth-child(5),
+.pending-canceled-rejected .auctions-table td:nth-child(5) {
+  min-width: 80px;
+} /* Status */
+.queued-auctions .auctions-table th:nth-child(6),
+.queued-auctions .auctions-table td:nth-child(6),
+.pending-canceled-rejected .auctions-table th:nth-child(6),
+.pending-canceled-rejected .auctions-table td:nth-child(6) {
+  min-width: 120px;
+} /* Actions */
+
+/* Completed Auctions table column widths */
+.completed-auctions .auctions-table th:nth-child(1),
+.completed-auctions .auctions-table td:nth-child(1) {
+  min-width: 120px;
+} /* Token ID */
+.completed-auctions .auctions-table th:nth-child(2),
+.completed-auctions .auctions-table td:nth-child(2) {
+  min-width: 120px;
+} /* Seller */
+.completed-auctions .auctions-table th:nth-child(3),
+.completed-auctions .auctions-table td:nth-child(3) {
+  min-width: 100px;
+} /* Final Bid */
+.completed-auctions .auctions-table th:nth-child(4),
+.completed-auctions .auctions-table td:nth-child(4) {
+  min-width: 120px;
+} /* Winner */
+.completed-auctions .auctions-table th:nth-child(5),
+.completed-auctions .auctions-table td:nth-child(5) {
+  min-width: 120px;
+} /* End Time */
+.completed-auctions .auctions-table th:nth-child(6),
+.completed-auctions .auctions-table td:nth-child(6) {
+  min-width: 80px;
+} /* NFT Transferred */
+.completed-auctions .auctions-table th:nth-child(7),
+.completed-auctions .auctions-table td:nth-child(7) {
+  min-width: 120px;
+} /* Actions */
+
+.auctions-table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.auctions-table tbody tr:hover {
+  background: rgba(255, 77, 166, 0.1);
+  transition: background 0.2s ease;
+}
+
+.auctions-table td button {
+  padding: 0.5rem 0.9rem;
+  margin: 0.2rem 0.4rem 0.2rem 0;
+  border: none;
+  border-radius: 0.4rem;
+  color: #f8fafc;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: linear-gradient(90deg, #ff007a, #ff4da6);
+  white-space: nowrap;
+}
+
+.auctions-table td button.approve-button {
+  background: #00cc70;
+}
+
+.auctions-table td button.approve-button:hover {
+  background: #00a55a;
+  transform: scale(1.05);
+}
+
+.auctions-table td button.reject-button {
+  background: #e0246a;
+}
+
+.auctions-table td button.reject-button:hover {
+  background: #b81d55;
+  transform: scale(1.05);
+}
+
+.auctions-table td button.delist-button {
+  background: #ff9800;
+}
+
+.auctions-table td button.delist-button:hover {
+  background: #d87e00;
+  transform: scale(1.05);
+}
+
+.auctions-table td button.release-button {
+  background: #cc0000;
+}
+
+.auctions-table td button.release-button:hover {
+  background: #a30000;
+  transform: scale(1.05);
+}
+
+.auctions-table td button.release-nft-button {
+  background: #2196f3;
+}
+
+.auctions-table td button.release-nft-button:hover {
+  background: #1a7acc;
+  transform: scale(1.05);
+}
+
+.auctions-table td button:disabled {
+  background: #6b7280;
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+}
+
+.error {
+  color: #ff4da6;
+  text-align: center;
+  font-size: 0.9rem;
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: rgba(255, 77, 166, 0.1);
+  border-radius: 0.4rem;
+  border: 1px solid #ff4da6;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Snackbar styling */
+.MuiSnackbar-root {
+  z-index: 4000;
+  top: 20px !important;
+  right: 20px !important;
+  max-width: 400px;
+  animation: slideIn 0.5s ease forwards;
+}
+
+.MuiAlert-root {
+  border-radius: 0.4rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid #ff4da6;
+  box-shadow: 0 4px 12px rgba(255, 0, 122, 0.3);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Desktop-specific adjustments */
+@media (min-width: 769px) {
+  .admin-view-container {
+    padding: 1.5rem;
+  }
+
+  .auctions-table {
+    overflow-x: auto;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .admin-view-container {
+    margin: 0.5rem;
+    padding: 1rem;
+  }
+
+  .admin-view-container h2 {
+    font-size: 1.5rem;
+  }
+
+  .auctions-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #ff4da6 rgba(255, 255, 255, 0.1);
+  }
+
+  .auctions-table::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .auctions-table::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+
+  .auctions-table::-webkit-scrollbar-thumb {
+    background: #ff4da6;
+    border-radius: 4px;
+  }
+
+  .auctions-table th,
+  .auctions-table td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    min-width: 100px;
+  }
+
+  .auctions-table td button {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.8rem;
+    margin: 0.2rem;
+  }
+
+  .error {
+    font-size: 0.85rem;
+    padding: 0.5rem;
+  }
+
+  .MuiSnackbar-root {
+    top: 10px !important;
+    right: 10px !important;
+    width: calc(100% - 20px);
+    max-width: 90%;
+  }
+}

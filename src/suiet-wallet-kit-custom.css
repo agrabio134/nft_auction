@@ -1,0 +1,65 @@
+/* Import the default SUI Wallet Kit CSS */
+@import '@suiet/wallet-kit/style.css';
+
+/* Override CSS Variables */
+:root {
+  --wkit-accent-hs: 330, 100%; /* Matches MUI primary.main #FF007A (hsl: 330, 100%, 50%) */
+  --wkit-on-accent-rgb: 248, 250, 252; /* Matches MUI text.primary #F8FAFC */
+  --wkit-font-family: 'Poppins', 'Inter', sans-serif; /* Matches MUI theme typography */
+  --wkit-font-size-medium: 0.85rem; /* Slightly smaller for desktop to prevent overflow */
+  --wkit-font-size-small: 0.75rem; /* Smaller for mobile */
+  --wkit-button-width: 100%; /* Increased for desktop to avoid text overflow */
+  --wkit-border-radius: 8px; /* Matches MUI button border-radius */
+  --wkit-line-height-medium: 1.2; /* Tighter line-height for better text fit */
+}
+
+/* Override ConnectButton styles */
+.wkit-button {
+  background-color: hsl(var(--wkit-accent-hs), 50%); /* #FF007A */
+  color: rgb(var(--wkit-on-accent-rgb)); /* #F8FAFC */
+  font-family: var(--wkit-font-family);
+  font-size: var(--wkit-font-size-medium);
+  font-weight: 500;
+  height: 34px; /* Matches desktop MUI button height */
+  padding: 0 10px; /* Reduced padding for compact fit */
+  border-radius: var(--wkit-border-radius);
+  text-transform: none; /* Matches MUI button style */
+  line-height: var(--wkit-line-height-medium);
+  width: var(--wkit-button-width);
+  margin: 0 4px; /* Small margin for spacing in navbar */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Handle long text gracefully */
+}
+
+.wkit-button:hover {
+  background-color: hsl(var(--wkit-accent-hs), 40%); /* Darker shade #C6005E */
+  transform: translateY(-1px); /* Subtle lift effect */
+}
+
+/* Mobile-specific styles */
+@media (max-width: 900px) {
+  :root {
+        --wkit-button-width: 100%; /* Full width in mobile drawer */
+
+    --wkit-font-size-medium: 0.75rem; /* Smaller font for mobile */
+  }
+  .wkit-connected-button{
+    display: flex;
+    flex-direction: column;
+  }
+
+  .wkit-button {
+    height: 28px; /* Smaller height for mobile */
+    font-size: var(--wkit-font-size-medium);
+    padding: 0 8px; /* Tighter padding for mobile */
+    margin: 0; /* Remove margin in drawer */
+    max-width: 180px; /* Prevent overly wide button */
+    width: 100%; /* Ensure full width within max-width */
+    box-sizing: border-box;
+  }
+}
