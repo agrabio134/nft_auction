@@ -1080,10 +1080,28 @@ function AdminView() {
               {auctions.filter(a => a.status === 'active').map((auction) => (
                 <tr key={auction.id}>
                   <td>{auction.tokenId.slice(0, 6)}...${auction.tokenId.slice(-6)}</td>
-                  <td>{auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}</td>
+                  <td>
+                    <a
+                      href={`https://suivision.xyz/account/${auction.seller}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#00f', textDecoration: 'underline' }}
+                    >
+                      {auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}
+                    </a>
+                  </td>
                   <td>{(auction.startingBid / 1_000_000_000).toFixed(2)}</td>
                   <td>{(auction.currentBid / 1_000_000_000).toFixed(2)}</td>
-                  <td>{auction.highestBidder.slice(0, 6)}...${auction.highestBidder.slice(-6)}</td>
+                  <td>
+                    <a
+                      href={`https://suivision.xyz/account/${auction.highestBidder}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#00f', textDecoration: 'underline' }}
+                    >
+                      {auction.highestBidder.slice(0, 6)}...${auction.highestBidder.slice(-6)}
+                    </a>
+                  </td>
                   <td>{getTimeLeft(auction.startedAt, auction.auctionDuration)}</td>
                   <td>
                     <button className="delist-button" onClick={() => handleDelist(auction)}>Delist</button>
@@ -1115,7 +1133,16 @@ function AdminView() {
               {auctions.filter(a => a.status === 'queued').map((auction) => (
                 <tr key={auction.id}>
                   <td>{auction.tokenId.slice(0, 6)}...${auction.tokenId.slice(-6)}</td>
-                  <td>{auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}</td>
+                  <td>
+                    <a
+                      href={`https://suivision.xyz/account/${auction.seller}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#00f', textDecoration: 'underline' }}
+                    >
+                      {auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}
+                    </a>
+                  </td>
                   <td>{(auction.startingBid / 1_000_000_000).toFixed(2)}</td>
                   <td>{auction.auctionDuration}</td>
                   <td>{auction.status}</td>
@@ -1159,9 +1186,27 @@ function AdminView() {
               {auctions.filter(a => a.status === 'completed').map((auction) => (
                 <tr key={auction.id}>
                   <td>{auction.tokenId.slice(0, 6)}...${auction.tokenId.slice(-6)}</td>
-                  <td>{auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}</td>
+                  <td>
+                    <a
+                      href={`https://suivision.xyz/account/${auction.seller}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#00f', textDecoration: 'underline' }}
+                    >
+                      {auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}
+                    </a>
+                  </td>
                   <td>{(auction.finalBid / 1_000_000_000).toFixed(2) || 'N/A'}</td>
-                  <td>{auction.winner.slice(0, 6)}...${auction.winner.slice(-6)}</td>
+                  <td>
+                    <a
+                      href={`https://suivision.xyz/account/${auction.winner}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#00f', textDecoration: 'underline' }}
+                    >
+                      {auction.winner.slice(0, 6)}...${auction.winner.slice(-6)}
+                    </a>
+                  </td>
                   <td>{formatCompletedAt(auction.completedAt)}</td>
                   <td>{auction.nftTransferred ? 'Yes' : 'No'}</td>
                   <td>
@@ -1210,7 +1255,16 @@ function AdminView() {
                 {auctions.filter(a => ['pending', 'canceled', 'rejected'].includes(a.status)).map((auction) => (
                   <tr key={auction.id}>
                     <td>{auction.tokenId.slice(0, 6)}...${auction.tokenId.slice(-6)}</td>
-                    <td>{auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}</td>
+                    <td>
+                      <a
+                        href={`https://suivision.xyz/account/${auction.seller}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: '#00f', textDecoration: 'underline' }}
+                      >
+                        {auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}
+                      </a>
+                    </td>
                     <td>{(auction.startingBid / 1_000_000_000).toFixed(2)}</td>
                     <td>{auction.auctionDuration}</td>
                     <td>{auction.status}</td>
