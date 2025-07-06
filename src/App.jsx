@@ -327,7 +327,7 @@ function App() {
     { label: 'Live Auction', onClick: handleAuctions, to: '/' },
     { label: 'Collections', onClick: handleCollections, to: '/collections' },
     { label: 'My NFTs', onClick: handleMyNfts, to: '/my-nfts' },
-    // { label: 'Admin', onClick: handleAdmin, to: '/admin' },
+    { label: 'Admin', onClick: handleAdmin, to: '/admin' },
   ];
 
   return (
