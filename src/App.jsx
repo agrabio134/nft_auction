@@ -32,7 +32,8 @@ import LiveAuction from './components/LiveAuction';
 import '@suiet/wallet-kit/style.css'; // Default SUI Wallet Kit CSS
 import './suiet-wallet-kit-custom.css'; // Custom CSS
 
-const isMaintenance = 1; // Set to 1 to enable maintenance mode
+const isMaintenance = 3; // Updated to 3 for MAINNET public test completion
+
 // GraphQL Queries
 const FETCH_COLLECTIONS = gql`
   query fetchCollectionInfo($slug: String) {
@@ -187,6 +188,45 @@ function App() {
     );
   }
 
+  if (isMaintenance === 3) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Container maxWidth="sm">
+            <Alert 
+              severity="success" 
+              sx={{ 
+                bgcolor: 'background.paper',
+                p: 3,
+                textAlign: 'center',
+                borderRadius: 2,
+                boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+              }}
+            >
+              <Typography variant="h5" sx={{ mb: 2, fontWeight: 700, color: 'primary.main' }}>
+                MAINNET Public Test Completed!
+              </Typography>
+              <Typography variant="body1" sx={{ color: 'text.primary', mb: 2 }}>
+                Thank you for participating in the Lofita Auction MAINNET public test! 
+                Please submit your opinion or suggestions via the link below.
+              </Typography>
+              <Button
+                variant="contained"
+                color="primary"
+                href="https://forms.gle/RA5zGQobjac7vD3R6"
+                target="_blank"
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Submit Feedback
+              </Button>
+            </Alert>
+          </Container>
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
   const themeInstance = useTheme();
   const isMobile = useMediaQuery(themeInstance.breakpoints.down('md'));
 
@@ -211,8 +251,6 @@ function App() {
     variables: { slug: '0x9f48e186b1527bd164960a03f392c14669acfd1ef560fb6138ad0918e6e712a3' },
     onError: (error) => console.error('Doonies query error:', error.message),
   });
-
-
 
   const collections = [
     ...(yetisData?.sui.collections || []),
