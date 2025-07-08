@@ -32,7 +32,7 @@ import LiveAuction from './components/LiveAuction';
 import '@suiet/wallet-kit/style.css'; // Default SUI Wallet Kit CSS
 import './suiet-wallet-kit-custom.css'; // Custom CSS
 
-const isMaintenance = 3; // Updated to 3 for MAINNET public test completion
+const isMaintenance = 1; // Updated to 3 for MAINNET public test completion
 
 // GraphQL Queries
 const FETCH_COLLECTIONS = gql`
