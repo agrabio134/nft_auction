@@ -86,6 +86,7 @@ function ApplyForm() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
   const [termsViewed, setTermsViewed] = useState(false);
   const hasCheckedTokenId = useRef(false);
 
@@ -345,9 +346,14 @@ function ApplyForm() {
     setSuccess('');
   };
 
-  const handleTermsClick = () => {
+  const handleTermsOpen = () => {
+    setTermsModalOpen(true);
     setTermsViewed(true);
     setError('');
+  };
+
+  const handleTermsClose = () => {
+    setTermsModalOpen(false);
   };
 
   const handleModalClose = () => {
@@ -646,7 +652,11 @@ function ApplyForm() {
               label={
                 <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'text.primary' }}>
                   I agree to the{' '}
-                  <Link href="/terms" target="_blank" rel="noopener noreferrer" onClick={handleTermsClick}>
+                  <Link
+                    component="button"
+                    onClick={handleTermsOpen}
+                    sx={{ fontSize: '0.8rem', color: 'primary.main', textDecoration: 'underline' }}
+                  >
                     Terms and Conditions
                   </Link>
                   . The NFT will be transferred to a sharable admin kiosk.
@@ -695,6 +705,7 @@ function ApplyForm() {
             </Box>
           )}
         </Box>
+        {/* Receipt Modal */}
         <Modal
           open={modalOpen}
           onClose={handleModalClose}
@@ -758,6 +769,72 @@ function ApplyForm() {
               color="primary"
               onClick={handleModalClose}
               sx={{ fontSize: '0.8rem', px: 2, py: 0.5 }}
+            >
+              Close
+            </Button>
+          </Paper>
+        </Modal>
+        {/* Terms and Conditions Modal */}
+        <Modal
+          open={termsModalOpen}
+          onClose={handleTermsClose}
+          aria-labelledby="terms-modal-title"
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Paper
+            sx={{
+              maxWidth: 600,
+              maxHeight: '80vh',
+              p: 3,
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              boxShadow: 24,
+              overflowY: 'auto',
+            }}
+          >
+            <Typography
+              id="terms-modal-title"
+              variant="h6"
+              sx={{ fontFamily: '"Poppins", "Roboto", sans-serif', fontWeight: 700, mb: 2, color: 'text.primary' }}
+            >
+              Terms and Conditions
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 2 }}>
+              By using Lofita Auction, you agree to the following terms and conditions:
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 1 }}>
+              <strong>1. Acceptance of Terms</strong><br />
+              By accessing or using the Lofita Auction platform, you agree to be bound by these Terms and Conditions. If you do not agree, you may not use the platform.
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 1 }}>
+              <strong>2. NFT Listing and Transfer</strong><br />
+              When listing an NFT for auction, you agree to transfer the NFT to a sharable admin kiosk managed by Lofita Auction. You represent that you are the rightful owner of the NFT or have the authority to list it.
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 1 }}>
+              <strong>3. Fees and Payments</strong><br />
+              Listing an NFT may require gas fees on the Sui blockchain. Priority listings may require LOFITA tokens as specified. All payments are non-refundable unless otherwise stated.
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 1 }}>
+              <strong>4. User Responsibilities</strong><br />
+              You are responsible for maintaining the security of your wallet and ensuring that all information provided is accurate. Lofita Auction is not liable for any loss due to unauthorized access to your wallet.
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 1 }}>
+              <strong>5. Platform Availability</strong><br />
+              Lofita Auction does not guarantee uninterrupted access to the platform and may perform maintenance or updates that temporarily restrict access.
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 2 }}>
+              <strong>6. Limitation of Liability</strong><br />
+              Lofita Auction is not liable for any indirect, incidental, or consequential damages arising from your use of the platform, including loss of NFTs or funds due to blockchain errors or wallet issues.
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 2 }}>
+              <strong>Contact</strong><br />
+              For questions or support, contact us via our <Link href="https://discord.gg/lofita" target="_blank" rel="noopener noreferrer">Discord</Link>.
+            </Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleTermsClose}
+              sx={{ fontSize: '0.8rem', px: 2, py: 0.5, display: 'block', mx: 'auto' }}
             >
               Close
             </Button>

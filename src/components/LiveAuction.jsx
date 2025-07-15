@@ -268,14 +268,12 @@ function LiveAuction() {
           })
       );
 
-      // Add the starting bid
       bidHistoryData.push({
         time: new Date(selectedAuction.startedAt || selectedAuction.queuedAt || Date.now()).toLocaleString('en-US', { hour12: true }),
         amount: parseFloat((selectedAuction.startingBid / 1_000_000_000).toFixed(2)),
         bidder: selectedAuction.seller.slice(0, 6) + '...' + selectedAuction.seller.slice(-6),
       });
 
-      // Sort bids by amount in descending order (highest to lowest)
       bidHistoryData.sort((a, b) => b.amount - a.amount);
 
       console.log('fetchLiveAuction: Validating kiosk object:', selectedAuction.kioskId);
@@ -307,7 +305,7 @@ function LiveAuction() {
         id: selectedAuction.id,
         token_id: selectedAuction.tokenId,
         name: contentFields.name || 'Unknown NFT',
-        media_url: contentFields.url || contentFields.image_url || contentFields.media_url || '',
+        media_url: contentFields.url || contentFields.image_url || contentFields.media_url || '/nft_placeholder.png',
         media_type: contentFields.media_type || 'image',
         ranking: selectedAuction.ranking || null,
         owner: selectedAuction.seller,
@@ -327,6 +325,12 @@ function LiveAuction() {
       setHighestBidderDisplay(blockchainHighestBidder === selectedAuction.seller ? 'None' : blockchainHighestBidder.slice(0, 6) + '...' + blockchainHighestBidder.slice(-6));
       setBidHistory(bidHistoryData);
       console.log('fetchLiveAuction: Successfully set auction data');
+      console.log('LiveAuction data:', {
+        media_url: contentFields.url || contentFields.image_url || contentFields.media_url,
+        collection: selectedAuction.collection,
+        token_id: selectedAuction.tokenId,
+        auctionObjectId: auctionId,
+      });
     } catch (err) {
       console.error('fetchLiveAuction: Error:', err.message, err.stack);
       Sentry.captureException(err);
@@ -363,7 +367,7 @@ function LiveAuction() {
           id: queuedAuction.id,
           token_id: queuedAuction.tokenId,
           name: contentFields.name || 'Unknown NFT',
-          media_url: contentFields.url || contentFields.image_url || contentFields.media_url || '',
+          media_url: contentFields.url || contentFields.image_url || contentFields.media_url || '/nft_placeholder.png',
           seller: queuedAuction.seller,
           collection: queuedAuction.collection,
         });
@@ -672,18 +676,18 @@ function LiveAuction() {
       console.warn('Invalid or empty media_url:', url);
       return '/nft_placeholder.png';
     }
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      console.log('Original URL:', url);
+      return url;
+    }
     if (url.startsWith('walrus://')) {
       const transformedUrl = `https://walrus.tusky.io/${url.replace('walrus://', '')}`;
       console.log('Transformed walrus URL:', transformedUrl);
       return transformedUrl;
     }
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      const transformedUrl = `https://walrus.tusky.io/${url.replace(/^\/+/, '')}`;
-      console.log('Transformed relative URL:', transformedUrl);
-      return transformedUrl;
-    }
-    console.log('Original URL:', url);
-    return url;
+    const transformedUrl = `https://walrus.tusky.io/${url.replace(/^\/+/, '')}`;
+    console.log('Transformed relative URL:', transformedUrl);
+    return transformedUrl;
   };
 
   const formatCompletedAt = (completedAt) => {
@@ -698,11 +702,18 @@ function LiveAuction() {
     });
   };
 
-  const collectionAddress = liveAuction?.collection?.split('::')[0] || 'unknown';
-  const tradeportUrl = liveAuction?.collection && liveAuction?.token_id && collectionAddress !== 'unknown' && /^0x[a-fA-F0-9]{64}$/.test(collectionAddress)
+  const collectionAddress = liveAuction?.collection || 'unknown';
+  const isValidCollectionAddress = collectionAddress !== 'unknown' && /^0x[a-fA-F0-9]+$/.test(collectionAddress);
+  const tradeportUrl = liveAuction?.collection && liveAuction?.token_id && isValidCollectionAddress
     ? `https://www.tradeport.xyz/sui/collection/${encodeURIComponent(collectionAddress)}?bottomTab=trades&tab=items&tokenId=${liveAuction.token_id}`
     : null;
-  console.log('Generated Tradeport URL:', tradeportUrl);
+  console.log('Tradeport URL Debug:', {
+    collection: liveAuction?.collection,
+    collectionAddress,
+    token_id: liveAuction?.token_id,
+    isValidCollectionAddress,
+    tradeportUrl
+  });
 
   if (isLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress sx={{ color: '#FF007A' }} /></Box>;
 
@@ -728,43 +739,50 @@ function LiveAuction() {
                     e.target.alt = 'Image unavailable';
                   }}
                 />
-{tradeportUrl ? (
-  <Box sx={{ mt: 1, textAlign: 'center' }}>
-    <Link href={tradeportUrl} target="_blank" rel="noopener noreferrer" aria-label="View on Tradeport">
-      <img src="/tradeport-logo.png" alt="Tradeport Logo" style={{ width: 24, height: 24 }} />
-    </Link>
-  </Box>
-) : (
-  <Typography variant="body2" sx={{ mt: 1, textAlign: 'center', color: '#FF4DA6' }}>
-    Tradeport link unavailable
-  </Typography>
-)}
-<Link
-  href={`https://suivision.xyz/object/${liveAuction.token_id}`}
-  target="_blank"
-  rel="noopener noreferrer"
-  sx={{ textDecoration: 'none' }}
-  aria-label="View on Suivision"
->
-  <Typography
-    variant="body2"
-    sx={{
-      fontSize: '0.9rem',
-      textAlign: 'center',
-      color: '#F8FAFC',
-      opacity: 0.8,
-      '&:hover': { color: '#FF4DA6', textDecoration: 'underline' },
-    }}
-  >
-    Token ID: {liveAuction.token_id.slice(0, 6)}...${liveAuction.token_id.slice(-6)}
-  </Typography>
-</Link>
-<Typography
-  variant="body2"
-  sx={{ fontSize: '0.9rem', textAlign: 'center', color: '#F8FAFC', opacity: 0.8 }}
->
-  Ranking: {liveAuction.ranking || 'N/A'} / 10,000
-</Typography>
+                {tradeportUrl ? (
+                  <Box sx={{ mt: 1, textAlign: 'center' }}>
+                    <Link
+                      href={tradeportUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="View on Tradeport"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <img src="/tradeport-logo.png" alt="Tradeport Logo" style={{ width: 24, height: 24 }} onError={(e) => e.target.src = '/nft_placeholder.png'} />
+                    </Link>
+                  </Box>
+                ) : (
+                  <Typography variant="body2" sx={{ mt: 1, textAlign: 'center', color: '#FF4DA6' }}>
+                    Tradeport link unavailable
+                  </Typography>
+                )}
+                <Link
+                  href={`https://suivision.xyz/object/${liveAuction.token_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{ textDecoration: 'none' }}
+                  aria-label="View on Suivision"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontSize: '0.9rem',
+                      textAlign: 'center',
+                      color: '#F8FAFC',
+                      opacity: 0.8,
+                      '&:hover': { color: '#FF4DA6', textDecoration: 'underline' },
+                    }}
+                  >
+                    Token ID: {liveAuction.token_id.slice(0, 6)}...${liveAuction.token_id.slice(-6)}
+                  </Typography>
+                </Link>
+                <Typography
+                  variant="body2"
+                  sx={{ fontSize: '0.9rem', textAlign: 'center', color: '#F8FAFC', opacity: 0.8 }}
+                >
+                  Ranking: {liveAuction.ranking || 'N/A'} / 10,000
+                </Typography>
               </Box>
               <CardContent sx={{ width: { xs: '100%', sm: '60%' }, display: 'flex', flexDirection: 'column', gap: 1, p: 1, color: '#F8FAFC' }}>
                 <Typography variant="h5" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 700, fontSize: { xs: '1.5rem', sm: '1.8rem' }, textAlign: 'center', textShadow: '0 0 6px rgba(255,0,122,0.5)' }}>{liveAuction.name || 'Unknown NFT'}</Typography>
@@ -803,50 +821,50 @@ function LiveAuction() {
                 <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#B0B3B8', textAlign: 'center' }}>No bids yet</Typography>
               )}
             </Card>
+            <Card sx={{ maxWidth: { xs: '100%', sm: 600 }, width: '100%', bgcolor: 'rgba(255,255,255,0.03)', p: 1.5, borderRadius: 1.5, border: '3px solid #FF0000', boxShadow: '0 2px 8px rgba(255,0,122,0.3)', display: 'block !important', visibility: 'visible !important' }}>
+              <Typography variant="h6" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, color: '#FF007A', mb: 1, textAlign: 'center', fontSize: { xs: '1.2rem', md: '1.5rem' } }}>Auction Win History</Typography>
+              {completedError && (
+                <Alert severity="error" sx={{ mb: 1, fontSize: '0.85rem', textAlign: 'center', bgcolor: 'rgba(255,0,122,0.1)', color: '#F8FAFC', border: '1px solid #FF4DA6', borderRadius: 1, p: 1 }}>
+                  {completedError}
+                </Alert>
+              )}
+              <Box sx={{ maxHeight: 200, overflowY: 'auto', px: 1 }}>
+                {completedAuctions.length > 0 ? (
+                  completedAuctions.slice(0, 5).map((auction, index) => {
+                    console.log('Rendering auction win entry:', {
+                      id: auction.id,
+                      name: auction.name,
+                      winner: auction.winner,
+                      link: auction.winner !== 'None' ? `https://suivision.xyz/account/${auction.winner}` : null
+                    });
+                    return (
+                      <Typography key={index} variant="body2" sx={{ fontSize: '0.85rem', color: '#F8FAFC', py: 0.5, borderBottom: '1px solid rgba(255,77,166,0.2)', '&:last-child': { borderBottom: 'none' } }}>
+                        {formatCompletedAt(auction.completedAt)} - {auction.name} won by{' '}
+                        {auction.winner === 'None' ? (
+                          'None'
+                        ) : (
+                          <a
+                            href={`https://suivision.xyz/account/${auction.winner}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#00f', textDecoration: 'underline' }}
+                          >
+                            {auction.winner.slice(0, 6)}...{auction.winner.slice(-6)}
+                          </a>
+                        )}{' '}
+                        for {auction.finalBid.toFixed(2)} SUI
+                      </Typography>
+                    );
+                  })
+                ) : (
+                  <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#B0B3B8', textAlign: 'center' }}>
+                    {completedError || 'No completed auctions'}
+                  </Typography>
+                )}
+              </Box>
+            </Card>
           </>
         )}
-        <Card sx={{ maxWidth: { xs: '100%', sm: 600 }, width: '100%', bgcolor: 'rgba(255,255,255,0.03)', p: 1.5, borderRadius: 1.5, border: '3px solid #FF0000', boxShadow: '0 2px 8px rgba(255,0,122,0.3)', display: 'block !important', visibility: 'visible !important' }}>
-          <Typography variant="h6" sx={{ fontFamily: '"Poppins", sans-serif', fontWeight: 600, color: '#FF007A', mb: 1, textAlign: 'center', fontSize: { xs: '1.2rem', md: '1.5rem' } }}>Auction Win History</Typography>
-          {completedError && (
-            <Alert severity="error" sx={{ mb: 1, fontSize: '0.85rem', textAlign: 'center', bgcolor: 'rgba(255,0,122,0.1)', color: '#F8FAFC', border: '1px solid #FF4DA6', borderRadius: 1, p: 1 }}>
-              {completedError}
-            </Alert>
-          )}
-          <Box sx={{ maxHeight: 200, overflowY: 'auto', px: 1 }}>
-            {completedAuctions.length > 0 ? (
-              completedAuctions.slice(0, 5).map((auction, index) => {
-                console.log('Rendering auction win entry:', {
-                  id: auction.id,
-                  name: auction.name,
-                  winner: auction.winner,
-                  link: auction.winner !== 'None' ? `https://suivision.xyz/account/${auction.winner}` : null
-                });
-                return (
-                  <Typography key={index} variant="body2" sx={{ fontSize: '0.85rem', color: '#F8FAFC', py: 0.5, borderBottom: '1px solid rgba(255,77,166,0.2)', '&:last-child': { borderBottom: 'none' } }}>
-                    {formatCompletedAt(auction.completedAt)} - {auction.name} won by{' '}
-                    {auction.winner === 'None' ? (
-                      'None'
-                    ) : (
-                      <a
-                        href={`https://suivision.xyz/account/${auction.winner}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: '#00f', textDecoration: 'underline' }}
-                      >
-                        {auction.winner.slice(0, 6)}...{auction.winner.slice(-6)}
-                      </a>
-                    )}{' '}
-                    for {auction.finalBid.toFixed(2)} SUI
-                  </Typography>
-                );
-              })
-            ) : (
-              <Typography variant="body2" sx={{ fontSize: '0.85rem', color: '#B0B3B8', textAlign: 'center' }}>
-                {completedError || 'No completed auctions'}
-              </Typography>
-            )}
-          </Box>
-        </Card>
       </Box>
       {queuedAuctions.length > 0 && (
         <Box sx={{ flex: { xs: 'none', md: 1 }, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
