@@ -10,13 +10,13 @@ import * as Sentry from '@sentry/react';
 import '../styles/AdminView.css';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: "AIzaSyDDcwmxqo2LkCm2a3fXbDvEbi-sPkrYcOQ",
+  authDomain: "nft-auction-e169c.firebaseapp.com",
+  projectId: "nft-auction-e169c",
+  storageBucket: "nft-auction-e169c.firebasestorage.app",
+  messagingSenderId: "60237291411",
+  appId: "1:60237291411:web:9944186393a20f46779266",
+  measurementId: "G-43C6JXQDR2"
 };
 
 // Initialize Firebase only if not already initialized
@@ -38,10 +38,9 @@ const suiClient = new SuiClient({ transport });
 const SHARED_KIOSK_ID = '0x88411ccf93211de8e5f2a6416e4db21de4a0d69fc308a2a72e970ff05758a083';
 const KIOSK_OWNER_CAP_ID = '0x5c04a377c1e8c8c54c200db56083cc93eb46243ad4c2cf5b90c4aaef8500cfee';
 const ADMIN_ADDRESS = '0x3a74d8e94bf49bb738a3f1dedcc962ed01c89f78d21c01d87ee5e6980f0750e9';
-const PACKAGE_ID = '0xb131077b710f4ceb89524b877600e2d14ca14d6321f1a327899ea97b0697a046';
+const PACKAGE_ID = '0xe698a87c127715a2a7606fcc7550d96daf082ccb398c95fb1f4d73104aefb6c8';
 const FEE_ADDRESS = '0x8cfed3962605beacf459a4bab2830a7c8e95bab8e60c228e65b2837565bd5fb8';
 const FEE_PERCENTAGE = 0.075; // 7.5% fee
-
 
 function AdminView() {
   const wallet = useWallet();
@@ -179,8 +178,7 @@ function AdminView() {
             startingBid: data.startingBid || 0,
             auctionDuration: data.auctionDuration || 0,
             status: data.status || 'unknown',
-            kioskId: data.kioskId || null,
-            kioskOwnerCapId: data.kioskOwnerCapId || null,
+            transferredTo: data.transferredTo || null,
             nftObjectId: data.nftObjectId || null,
             collection: data.collection || 'unknown',
             startedAt: data.startedAt || null,
@@ -189,9 +187,13 @@ function AdminView() {
             highestBidder: data.seller || 'N/A',
             completedAt: data.completedAt || null,
             winner: data.winner || 'N/A',
-            nftTransferred: !kioskItemIds.includes(data.nftObjectId),
+            nftTransferred: data.nftTransferred || !kioskItemIds.includes(data.nftObjectId),
             createdAt: data.createdAt || null,
-            finalBid: data.finalBid || 0, // Ensure finalBid is included
+            finalBid: data.finalBid || 0,
+            kioskId: data.kioskId || null,
+            kioskOwnerCapId: data.kioskOwnerCapId || null,
+            isPriority: data.isPriority || false,
+            receiptId: data.receiptId || 'N/A',
           };
 
           if (auction.status === 'active' && auction.auctionObjectId) {
@@ -220,6 +222,9 @@ function AdminView() {
         } else {
           const activeAuctions = auctionList.filter(a => a.status === 'active');
           const queuedAuctions = auctionList.filter(a => a.status === 'queued').sort((a, b) => {
+            // Prioritize isPriority auctions, then sort by createdAt
+            if (a.isPriority && !b.isPriority) return -1;
+            if (!a.isPriority && b.isPriority) return 1;
             const aTime = new Date(a.createdAt || 0).getTime();
             const bTime = new Date(b.createdAt || 0).getTime();
             return aTime - bTime;
@@ -301,7 +306,7 @@ function AdminView() {
           return unsubscribeEvents;
         } catch (err) {
           retryCount++;
-          console.warn(`Event subscription failed (attempt ${retryCount}/${maxRetries}): ${err.message}`);
+          console.warn(`Event subscription failed (attempt ${retryCount}/${maxRetries}: ${err.message}`);
           if (retryCount < maxRetries) {
             await new Promise(resolve => setTimeout(resolve, 5000 * retryCount));
           } else {
@@ -343,6 +348,9 @@ function AdminView() {
         setError('Missing NFT object ID, kiosk ID, or KioskOwnerCap ID.');
         return;
       }
+      if (!/^0x[a-fA-F0-9]{64}$/.test(nftObjectId)) {
+        throw new Error(`Invalid NFT object ID format: ${nftObjectId}`);
+      }
       if (kioskId !== SHARED_KIOSK_ID || kioskOwnerCapId !== KIOSK_OWNER_CAP_ID) {
         setError(`Auction must use the shared kiosk (${SHARED_KIOSK_ID}) and KioskOwnerCap (${KIOSK_OWNER_CAP_ID}).`);
         return;
@@ -355,7 +363,7 @@ function AdminView() {
         })
       );
       if (!capObject.data || capObject.data.content?.fields?.for !== kioskId || capObject.data.owner?.AddressOwner !== ADMIN_ADDRESS) {
-        throw new Error('Invalid KioskOwnerCap or not owned by admin.');
+        throw new Error(`Invalid KioskOwnerCap ${kioskOwnerCapId} or not owned by admin.`);
       }
 
       const kioskObject = await withRetry(() =>
@@ -371,7 +379,7 @@ function AdminView() {
       const kioskItems = await withRetry(() => suiClient.getDynamicFields({ parentId: kioskId }));
       const nftInKiosk = kioskItems.data.some(item => item.objectId === nftObjectId);
       if (!nftInKiosk) {
-        throw new Error(`NFT ${nftObjectId} is not in the kiosk ${kioskId}.`);
+        throw new Error(`NFT ${nftObjectId} is not in the kiosk ${kioskId}. Verify with: sui client object --id ${nftObjectId}`);
       }
 
       const tx = new TransactionBlock();
@@ -426,7 +434,7 @@ function AdminView() {
     } catch (err) {
       console.error('Error activating queued auction:', err);
       Sentry.captureException(err);
-      setError(`Failed to activate auction: ${err.message}`);
+      setError(`Failed to activate auction: ${err.message}. Verify NFT ID: ${auction.nftObjectId}`);
     }
   };
 
@@ -445,80 +453,188 @@ function AdminView() {
     }
     try {
       const nftObjectId = auction.nftObjectId;
-      const kioskId = auction.kioskId;
-      const kioskOwnerCapId = auction.kioskOwnerCapId;
-      if (!nftObjectId || !kioskId || !kioskOwnerCapId) {
-        setError('Missing NFT object ID, kiosk ID, or KioskOwnerCap ID.');
+      const seller = auction.seller;
+      if (!nftObjectId || !seller) {
+        setError('Missing NFT object ID or seller address.');
         return;
       }
-      if (kioskId !== SHARED_KIOSK_ID || kioskOwnerCapId !== KIOSK_OWNER_CAP_ID) {
-        setError(`Auction must use the shared kiosk (${SHARED_KIOSK_ID}) and KioskOwnerCap (${KIOSK_OWNER_CAP_ID}).`);
-        return;
+      if (!/^0x[a-fA-F0-9]{64}$/.test(nftObjectId)) {
+        throw new Error(`Invalid NFT object ID format: ${nftObjectId}`);
       }
 
+      // Verify NFT is owned by admin address
+      const nftObject = await withRetry(() =>
+        suiClient.getObject({
+          id: nftObjectId,
+          options: { showContent: true, showType: true, showOwner: true },
+        })
+      );
+      if (!nftObject.data) {
+        throw new Error(`NFT ${nftObjectId} not found. Verify ID with: sui client object --id ${nftObjectId}`);
+      }
+      if (nftObject.data.owner?.AddressOwner !== ADMIN_ADDRESS) {
+        throw new Error(`NFT ${nftObjectId} is not owned by admin address ${ADMIN_ADDRESS}. Current owner: ${JSON.stringify(nftObject.data.owner)}`);
+      }
+
+      // Verify shared kiosk and KioskOwnerCap
       const capObject = await withRetry(() =>
         suiClient.getObject({
-          id: kioskOwnerCapId,
+          id: KIOSK_OWNER_CAP_ID,
           options: { showContent: true, showOwner: true },
         })
       );
-      if (!capObject.data || capObject.data.content?.fields?.for !== kioskId || capObject.data.owner?.AddressOwner !== ADMIN_ADDRESS) {
-        throw new Error('Invalid KioskOwnerCap or not owned by admin.');
+      if (!capObject.data || capObject.data.content?.fields?.for !== SHARED_KIOSK_ID || capObject.data.owner?.AddressOwner !== ADMIN_ADDRESS) {
+        throw new Error(`Invalid KioskOwnerCap ${KIOSK_OWNER_CAP_ID} or not owned by admin.`);
       }
 
       const kioskObject = await withRetry(() =>
         suiClient.getObject({
-          id: kioskId,
+          id: SHARED_KIOSK_ID,
           options: { showContent: true, showType: true, showOwner: true },
         })
       );
       if (!kioskObject.data || kioskObject.data.type !== '0x2::kiosk::Kiosk' || !kioskObject.data.owner?.Shared) {
-        throw new Error(`Kiosk ${kioskId} is invalid or not shared.`);
+        throw new Error(`Kiosk ${SHARED_KIOSK_ID} is invalid or not shared. Verify with: sui client object --id ${SHARED_KIOSK_ID}`);
       }
 
-      const kioskItems = await withRetry(() => suiClient.getDynamicFields({ parentId: kioskId }));
-      const nftInKiosk = kioskItems.data.some(item => item.objectId === nftObjectId);
-      if (!nftInKiosk) {
-        throw new Error(`NFT ${nftObjectId} is not in the kiosk ${kioskId}.`);
+      // Place NFT in shared kiosk
+      const tx = new TransactionBlock();
+      tx.moveCall({
+        target: `${PACKAGE_ID}::marketplace::place_nft`,
+        arguments: [
+          tx.object(SHARED_KIOSK_ID),
+          tx.object(KIOSK_OWNER_CAP_ID),
+          tx.object(nftObjectId),
+        ],
+        typeArguments: [auction.collection],
+      });
+
+      const gasBudget = await estimateGasBudget(tx);
+      tx.setGasBudget(gasBudget);
+
+      console.log('handleApprove: Executing transaction to place NFT', { nftObjectId, kioskId: SHARED_KIOSK_ID });
+      const result = await wallet.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        requestType: 'WaitForLocalExecution',
+        options: { showEffects: true, showObjectChanges: true },
+        chain: 'sui:mainnet',
+      });
+
+      if (result.errors || result.effects?.status.status !== 'success') {
+        if (retry) {
+          console.warn('handleApprove: Retrying place after 5000ms');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          return await handleApprove(auction, false);
+        }
+        throw new Error(`Failed to place NFT: ${JSON.stringify(result.errors || 'Transaction failed')}`);
       }
 
+      // Update Firestore with kiosk details
       await updateFirestoreWithRetry(doc(db, 'auctions', auction.id), {
         status: 'queued',
         updatedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
+        kioskId: SHARED_KIOSK_ID,
+        kioskOwnerCapId: KIOSK_OWNER_CAP_ID,
       });
 
       setSnackbar({
         open: true,
-        message: `Auction for NFT ${nftObjectId.slice(0, 6)}...${nftObjectId.slice(-6)} approved and added to queue!`,
+        message: `NFT ${nftObjectId.slice(0, 6)}...${nftObjectId.slice(-6)} placed in shared kiosk and queued for auction!`,
         severity: 'success',
       });
     } catch (err) {
       console.error('Error approving auction:', err);
       Sentry.captureException(err);
-      setError(`Failed to approve auction: ${err.message}`);
+      setError(`Failed to approve auction: ${err.message}. Verify NFT ID: ${auction.nftObjectId}`);
     }
   };
 
-  const handleReject = async (auctionId) => {
+  const handleReject = async (auction, retry = true) => {
+    if (!wallet.connected || !wallet.signAndExecuteTransactionBlock) {
+      setError('Please connect a compatible wallet.');
+      return;
+    }
     if (!isAuthenticated) {
       setError('Please wait for Firebase authentication.');
       return;
     }
+    if (wallet.account?.address !== ADMIN_ADDRESS) {
+      setError('Only the admin wallet can reject auctions.');
+      return;
+    }
     try {
-      await updateFirestoreWithRetry(doc(db, 'auctions', auctionId), {
+      const nftObjectId = auction.nftObjectId;
+      const seller = auction.seller;
+      if (!nftObjectId || !seller) {
+        setError('Missing NFT object ID or seller address.');
+        return;
+      }
+      if (!/^0x[a-fA-F0-9]{64}$/.test(nftObjectId)) {
+        throw new Error(`Invalid NFT object ID format: ${nftObjectId}`);
+      }
+
+      // Verify NFT is owned by admin address
+      const nftObject = await withRetry(() =>
+        suiClient.getObject({
+          id: nftObjectId,
+          options: { showContent: true, showType: true, showOwner: true },
+        })
+      );
+      if (!nftObject.data) {
+        throw new Error(`NFT ${nftObjectId} not found. Verify ID with: sui client object --id ${nftObjectId}`);
+      }
+      if (nftObject.data.owner?.AddressOwner !== ADMIN_ADDRESS) {
+        throw new Error(`NFT ${nftObjectId} is not owned by admin address ${ADMIN_ADDRESS}. Current owner: ${JSON.stringify(nftObject.data.owner)}`);
+      }
+
+      // Transfer NFT back to seller
+      const tx = new TransactionBlock();
+      tx.moveCall({
+        target: '0x2::transfer::public_transfer',
+        arguments: [
+          tx.object(nftObjectId),
+          tx.pure(seller),
+        ],
+        typeArguments: [auction.collection],
+      });
+
+      const gasBudget = await estimateGasBudget(tx);
+      tx.setGasBudget(gasBudget);
+
+      console.log('handleReject: Executing transaction to return NFT to seller', { nftObjectId, seller });
+      const result = await wallet.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        requestType: 'WaitForLocalExecution',
+        options: { showEffects: true, showObjectChanges: true },
+        chain: 'sui:mainnet',
+      });
+
+      if (result.errors || result.effects?.status.status !== 'success') {
+        if (retry) {
+          console.warn('handleReject: Retrying transfer after 5000ms');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          return await handleReject(auction, false);
+        }
+        throw new Error(`Failed to return NFT to seller: ${JSON.stringify(result.errors || 'Transaction failed')}`);
+      }
+
+      // Update Firestore
+      await updateFirestoreWithRetry(doc(db, 'auctions', auction.id), {
         status: 'rejected',
         updatedAt: new Date().toISOString(),
+        nftTransferred: true,
+        nftTransferredAt: new Date().toISOString(),
       });
+
       setSnackbar({
         open: true,
-        message: `Auction ${auctionId.slice(0, 6)}...${auctionId.slice(-6)} has been rejected.`,
+        message: `NFT ${nftObjectId.slice(0, 6)}...${nftObjectId.slice(-6)} rejected and returned to seller ${seller.slice(0, 6)}...${seller.slice(-6)}.`,
         severity: 'info',
       });
     } catch (err) {
       console.error('Error rejecting auction:', err);
       Sentry.captureException(err);
-      setError('Failed to reject auction.');
+      setError(`Failed to reject auction: ${err.message}. Verify NFT ID: ${auction.nftObjectId}`);
     }
   };
 
@@ -542,10 +658,12 @@ function AdminView() {
       const auctionObjectId = auction.auctionObjectId;
       const auctionId = auction.id;
       const isQueued = auction.status === 'queued';
-
       if (!nftObjectId || !kioskId || !kioskOwnerCapId) {
         setError('Missing NFT object ID, kiosk ID, or KioskOwnerCap ID.');
         return;
+      }
+      if (!/^0x[a-fA-F0-9]{64}$/.test(nftObjectId)) {
+        throw new Error(`Invalid NFT object ID format: ${nftObjectId}`);
       }
       if (kioskId !== SHARED_KIOSK_ID || kioskOwnerCapId !== KIOSK_OWNER_CAP_ID) {
         setError(`Auction must use the shared kiosk (${SHARED_KIOSK_ID}) and KioskOwnerCap (${KIOSK_OWNER_CAP_ID}).`);
@@ -563,7 +681,7 @@ function AdminView() {
         })
       );
       if (!capObject.data || capObject.data.content?.fields?.for !== kioskId || capObject.data.owner?.AddressOwner !== ADMIN_ADDRESS) {
-        throw new Error('Invalid KioskOwnerCap or not owned by admin.');
+        throw new Error(`Invalid KioskOwnerCap ${kioskOwnerCapId} or not owned by admin.`);
       }
 
       const kioskObject = await withRetry(() =>
@@ -579,9 +697,11 @@ function AdminView() {
       const kioskItems = await withRetry(() => suiClient.getDynamicFields({ parentId: kioskId }));
       const nftInKiosk = kioskItems.data.some(item => item.objectId === nftObjectId);
       if (!nftInKiosk) {
-        await updateFirestoreWithRetry(doc(db, 'auctions', auctionId), {
+        await updateFirestoreWithRetry(doc(db, 'auctions', auction.id), {
           status: 'canceled',
           updatedAt: new Date().toISOString(),
+          nftTransferred: true,
+          nftTransferredAt: new Date().toISOString(),
         });
         setSnackbar({
           open: true,
@@ -680,6 +800,8 @@ function AdminView() {
       await updateFirestoreWithRetry(doc(db, 'auctions', auction.id), {
         status: 'canceled',
         updatedAt: new Date().toISOString(),
+        nftTransferred: true,
+        nftTransferredAt: new Date().toISOString(),
       });
 
       setSnackbar({
@@ -690,7 +812,7 @@ function AdminView() {
     } catch (err) {
       console.error('Error delisting/withdrawing:', err);
       Sentry.captureException(err);
-      setError(`Failed to delist/withdraw: ${err.message}`);
+      setError(`Failed to delist/withdraw: ${err.message}. Verify NFT ID: ${auction.nftObjectId}`);
     }
   };
 
@@ -707,7 +829,6 @@ function AdminView() {
       setError('Only the admin wallet can release funds.');
       return;
     }
-
     try {
       const auctionObjectId = auction.auctionObjectId;
       const kioskId = auction.kioskId;
@@ -716,6 +837,9 @@ function AdminView() {
       if (!auctionObjectId || !kioskId || !kioskOwnerCapId || !nftObjectId) {
         setError('Missing Auction object ID, kiosk ID, KioskOwnerCap ID, or NFT object ID.');
         return;
+      }
+      if (!/^0x[a-fA-F0-9]{64}$/.test(nftObjectId)) {
+        throw new Error(`Invalid NFT object ID format: ${nftObjectId}`);
       }
 
       const auctionObject = await withRetry(() =>
@@ -738,7 +862,7 @@ function AdminView() {
         })
       );
       if (!capObject.data || capObject.data.content?.fields?.for !== kioskId || capObject.data.owner?.AddressOwner !== ADMIN_ADDRESS) {
-        throw new Error('Invalid KioskOwnerCap or not owned by admin.');
+        throw new Error(`Invalid KioskOwnerCap ${kioskOwnerCapId} or not owned by admin.`);
       }
 
       const kioskObject = await withRetry(() =>
@@ -754,7 +878,7 @@ function AdminView() {
       const kioskItems = await withRetry(() => suiClient.getDynamicFields({ parentId: kioskId }));
       const nftInKiosk = kioskItems.data.some(item => item.objectId === nftObjectId);
       if (!nftInKiosk) {
-        throw new Error(`NFT ${nftObjectId} is not in the kiosk ${kioskId}.`);
+        throw new Error(`NFT ${nftObjectId} is not in the kiosk ${kioskId}. Verify with: sui client object --id ${nftObjectId}`);
       }
 
       if (parseInt(auctionObject.data.content?.fields?.end_time || 0) > Date.now()) {
@@ -781,17 +905,17 @@ function AdminView() {
 
       const tx = new TransactionBlock();
       tx.moveCall({
-        target: `${PACKAGE_ID}::emergency_recovery::recover_funds`,
+        target: `${PACKAGE_ID}::marketplace::end_auction_no_transfer`,
         arguments: [
           tx.object(auctionObjectId),
-          tx.object('0x0'),
+          tx.object('0x6'),
         ],
       });
 
       const gasBudget = await estimateGasBudget(tx);
       tx.setGasBudget(gasBudget);
 
-      console.log('handleReleaseFunds: Executing recover_funds transaction', { auctionObjectId });
+      console.log('handleReleaseFunds: Executing end_auction_no_transfer transaction', { auctionObjectId });
       const result = await wallet.signAndExecuteTransactionBlock({
         transactionBlock: tx,
         requestType: 'WaitForLocalExecution',
@@ -801,11 +925,11 @@ function AdminView() {
 
       if (result.errors || result.effects?.status.status !== 'success') {
         if (retry) {
-          console.warn('AdminView: Retrying recover_funds after 5000ms');
+          console.warn('AdminView: Retrying end_auction_no_transfer after 5000ms');
           await new Promise(resolve => setTimeout(resolve, 5000));
           return await handleReleaseFunds(auction, false);
         }
-        throw new Error(`Failed to recover funds: ${JSON.stringify(result.errors || 'Transaction failed')}`);
+        throw new Error(`Failed to end auction: ${JSON.stringify(result.errors || 'Transaction failed')}`);
       }
 
       const balance = parseInt(auctionObject.data.content?.fields?.balance || 0) / 1_000_000_000;
@@ -832,6 +956,8 @@ function AdminView() {
       const queuedSnapshot = await getDocs(queuedQuery);
       if (!queuedSnapshot.empty) {
         const queuedAuctions = queuedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => {
+          if (a.isPriority && !b.isPriority) return -1;
+          if (!a.isPriority && b.isPriority) return 1;
           const aTime = new Date(a.createdAt || 0).getTime();
           const bTime = new Date(b.createdAt || 0).getTime();
           return aTime - bTime;
@@ -847,7 +973,7 @@ function AdminView() {
         await new Promise(resolve => setTimeout(resolve, 5000));
         return await handleReleaseFunds(auction, false);
       }
-      setError(`Failed to recover funds: ${err.message}. Please contact support for manual resolution.`);
+      setError(`Failed to recover funds: ${err.message}. Verify NFT ID: ${auction.nftObjectId}`);
     }
   };
 
@@ -874,6 +1000,9 @@ function AdminView() {
         setError('Missing NFT object ID, kiosk ID, KioskOwnerCap ID, or valid winner address.');
         return;
       }
+      if (!/^0x[a-fA-F0-9]{64}$/.test(nftObjectId)) {
+        throw new Error(`Invalid NFT object ID format: ${nftObjectId}`);
+      }
       if (kioskId !== SHARED_KIOSK_ID || kioskOwnerCapId !== KIOSK_OWNER_CAP_ID) {
         setError(`NFT release must use the shared kiosk (${SHARED_KIOSK_ID}) and KioskOwnerCap (${KIOSK_OWNER_CAP_ID}).`);
         return;
@@ -890,7 +1019,7 @@ function AdminView() {
         })
       );
       if (!capObject.data || capObject.data.content?.fields?.for !== kioskId || capObject.data.owner?.AddressOwner !== ADMIN_ADDRESS) {
-        throw new Error('Invalid KioskOwnerCap or not owned by admin.');
+        throw new Error(`Invalid KioskOwnerCap ${kioskOwnerCapId} or not owned by admin.`);
       }
 
       const kioskObject = await withRetry(() =>
@@ -906,7 +1035,7 @@ function AdminView() {
       const kioskItems = await withRetry(() => suiClient.getDynamicFields({ parentId: kioskId }));
       const nftInKiosk = kioskItems.data.some(item => item.objectId === nftObjectId);
       if (!nftInKiosk) {
-        await updateFirestoreWithRetry(doc(db, 'auctions', auctionId), {
+        await updateFirestoreWithRetry(doc(db, 'auctions', auction.id), {
           nftTransferred: true,
           nftTransferredAt: new Date().toISOString(),
         });
@@ -926,7 +1055,7 @@ function AdminView() {
         })
       );
       if (!nftObject.data) {
-        throw new Error(`NFT ${nftObjectId} not found.`);
+        throw new Error(`NFT ${nftObjectId} not found. Verify ID with: sui client object --id ${nftObjectId}`);
       }
 
       const listingObjectId = nftObject.data.owner?.ObjectOwner || null;
@@ -953,14 +1082,7 @@ function AdminView() {
         ],
         typeArguments: [auction.collection],
       });
-      tx.moveCall({
-        target: '0x2::transfer::public_transfer',
-        arguments: [
-          nft,
-          tx.pure(winner),
-        ],
-        typeArguments: [auction.collection],
-      });
+      tx.transferObjects([nft], winner);
 
       const gasBudget = await estimateGasBudget(tx);
       tx.setGasBudget(gasBudget);
@@ -982,7 +1104,7 @@ function AdminView() {
         throw new Error(`Failed to release NFT: ${JSON.stringify(result.errors || 'Transaction failed')}`);
       }
 
-      await updateFirestoreWithRetry(doc(db, 'auctions', auctionId), {
+      await updateFirestoreWithRetry(doc(db, 'auctions', auction.id), {
         nftTransferred: true,
         nftTransferredAt: new Date().toISOString(),
       });
@@ -996,7 +1118,7 @@ function AdminView() {
     } catch (err) {
       console.error('Error releasing NFT:', err);
       Sentry.captureException(err);
-      setError(`Failed to release NFT: ${err.message}. Please contact support for manual resolution or try the manual CLI steps.`);
+      setError(`Failed to release NFT: ${err.message}. Verify NFT ID: ${auction.nftObjectId}`);
     }
   };
 
@@ -1067,19 +1189,22 @@ function AdminView() {
           <table className="auctions-table">
             <thead>
               <tr>
+                <th>Receipt ID</th>
                 <th>Token ID</th>
                 <th>Seller</th>
                 <th>Starting Bid (SUI)</th>
                 <th>Current Bid (SUI)</th>
                 <th>Highest Bidder</th>
                 <th>Time Left</th>
+                <th>Priority</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {auctions.filter(a => a.status === 'active').map((auction) => (
                 <tr key={auction.id}>
-                  <td>{auction.tokenId.slice(0, 6)}...${auction.tokenId.slice(-6)}</td>
+                  <td>{auction.receiptId}</td>
+                  <td>{auction.tokenId.slice(0, 6)}...{auction.tokenId.slice(-6)}</td>
                   <td>
                     <a
                       href={`https://suivision.xyz/account/${auction.seller}`}
@@ -1087,7 +1212,7 @@ function AdminView() {
                       rel="noopener noreferrer"
                       style={{ color: '#00f', textDecoration: 'underline' }}
                     >
-                      {auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}
+                      {auction.seller.slice(0, 6)}...{auction.seller.slice(-6)}
                     </a>
                   </td>
                   <td>{(auction.startingBid / 1_000_000_000).toFixed(2)}</td>
@@ -1099,10 +1224,11 @@ function AdminView() {
                       rel="noopener noreferrer"
                       style={{ color: '#00f', textDecoration: 'underline' }}
                     >
-                      {auction.highestBidder.slice(0, 6)}...${auction.highestBidder.slice(-6)}
+                      {auction.highestBidder.slice(0, 6)}...{auction.highestBidder.slice(-6)}
                     </a>
                   </td>
                   <td>{getTimeLeft(auction.startedAt, auction.auctionDuration)}</td>
+                  <td>{auction.isPriority ? 'Yes' : 'No'}</td>
                   <td>
                     <button className="delist-button" onClick={() => handleDelist(auction)}>Delist</button>
                     <button className="release-button" onClick={() => handleReleaseFunds(auction)}>Release Funds</button>
@@ -1121,18 +1247,20 @@ function AdminView() {
           <table className="auctions-table">
             <thead>
               <tr>
+                <th>Receipt ID</th>
                 <th>Token ID</th>
                 <th>Seller</th>
                 <th>Starting Bid (SUI)</th>
                 <th>Duration (Hours)</th>
-                <th>Status</th>
+                <th>Priority</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {auctions.filter(a => a.status === 'queued').map((auction) => (
                 <tr key={auction.id}>
-                  <td>{auction.tokenId.slice(0, 6)}...${auction.tokenId.slice(-6)}</td>
+                  <td>{auction.receiptId}</td>
+                  <td>{auction.tokenId.slice(0, 6)}...{auction.tokenId.slice(-6)}</td>
                   <td>
                     <a
                       href={`https://suivision.xyz/account/${auction.seller}`}
@@ -1140,12 +1268,12 @@ function AdminView() {
                       rel="noopener noreferrer"
                       style={{ color: '#00f', textDecoration: 'underline' }}
                     >
-                      {auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}
+                      {auction.seller.slice(0, 6)}...{auction.seller.slice(-6)}
                     </a>
                   </td>
                   <td>{(auction.startingBid / 1_000_000_000).toFixed(2)}</td>
                   <td>{auction.auctionDuration}</td>
-                  <td>{auction.status}</td>
+                  <td>{auction.isPriority ? 'Yes' : 'No'}</td>
                   <td>
                     <button className="delist-button" onClick={() => handleDelist(auction)}>Delist</button>
                   </td>
@@ -1173,19 +1301,22 @@ function AdminView() {
           <table className="auctions-table">
             <thead>
               <tr>
+                <th>Receipt ID</th>
                 <th>Token ID</th>
                 <th>Seller</th>
                 <th>Final Bid (SUI)</th>
                 <th>Winner</th>
                 <th>End Time</th>
                 <th>NFT Transferred</th>
+                <th>Priority</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {auctions.filter(a => a.status === 'completed').map((auction) => (
                 <tr key={auction.id}>
-                  <td>{auction.tokenId.slice(0, 6)}...${auction.tokenId.slice(-6)}</td>
+                  <td>{auction.receiptId}</td>
+                  <td>{auction.tokenId.slice(0, 6)}...{auction.tokenId.slice(-6)}</td>
                   <td>
                     <a
                       href={`https://suivision.xyz/account/${auction.seller}`}
@@ -1193,7 +1324,7 @@ function AdminView() {
                       rel="noopener noreferrer"
                       style={{ color: '#00f', textDecoration: 'underline' }}
                     >
-                      {auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}
+                      {auction.seller.slice(0, 6)}...{auction.seller.slice(-6)}
                     </a>
                   </td>
                   <td>{(auction.finalBid / 1_000_000_000).toFixed(2) || 'N/A'}</td>
@@ -1204,11 +1335,12 @@ function AdminView() {
                       rel="noopener noreferrer"
                       style={{ color: '#00f', textDecoration: 'underline' }}
                     >
-                      {auction.winner.slice(0, 6)}...${auction.winner.slice(-6)}
+                      {auction.winner.slice(0, 6)}...{auction.winner.slice(-6)}
                     </a>
                   </td>
                   <td>{formatCompletedAt(auction.completedAt)}</td>
                   <td>{auction.nftTransferred ? 'Yes' : 'No'}</td>
+                  <td>{auction.isPriority ? 'Yes' : 'No'}</td>
                   <td>
                     {!auction.nftTransferred && auction.winner !== 'N/A' && auction.winner !== auction.seller && (
                       <button className="release-nft-button" onClick={() => handleReleaseNFT(auction)}>Release NFT</button>
@@ -1233,28 +1365,31 @@ function AdminView() {
       {!loading && (
         <Box sx={{ mb: 3 }} className="pending-canceled-rejected">
           <Typography variant="h6" sx={{ fontFamily: '"Poppins", "Roboto", sans-serif', fontWeight: 600, mb: 1, color: '#fff' }}>
-            Pending/Canceled/Rejected
+            Pending/Cancel Requested/Rejected
           </Typography>
-          {auctions.filter(a => ['pending', 'canceled', 'rejected'].includes(a.status)).length === 0 ? (
+          {auctions.filter(a => ['pending', 'cancel_requested', 'rejected'].includes(a.status)).length === 0 ? (
             <Typography sx={{ fontSize: '0.9rem', color: '#fff', textAlign: 'center' }}>
-              No pending, canceled, or rejected auctions.
+              No pending, cancel requested, or rejected auctions.
             </Typography>
           ) : (
             <table className="auctions-table">
               <thead>
                 <tr>
+                  <th>Receipt ID</th>
                   <th>Token ID</th>
                   <th>Seller</th>
                   <th>Starting Bid (SUI)</th>
                   <th>Duration (Hours)</th>
+                  <th>Priority</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {auctions.filter(a => ['pending', 'canceled', 'rejected'].includes(a.status)).map((auction) => (
+                {auctions.filter(a => ['pending', 'cancel_requested', 'rejected'].includes(a.status)).map((auction) => (
                   <tr key={auction.id}>
-                    <td>{auction.tokenId.slice(0, 6)}...${auction.tokenId.slice(-6)}</td>
+                    <td>{auction.receiptId}</td>
+                    <td>{auction.tokenId.slice(0, 6)}...{auction.tokenId.slice(-6)}</td>
                     <td>
                       <a
                         href={`https://suivision.xyz/account/${auction.seller}`}
@@ -1262,17 +1397,20 @@ function AdminView() {
                         rel="noopener noreferrer"
                         style={{ color: '#00f', textDecoration: 'underline' }}
                       >
-                        {auction.seller.slice(0, 6)}...${auction.seller.slice(-6)}
+                        {auction.seller.slice(0, 6)}...{auction.seller.slice(-6)}
                       </a>
                     </td>
                     <td>{(auction.startingBid / 1_000_000_000).toFixed(2)}</td>
                     <td>{auction.auctionDuration}</td>
+                    <td>{auction.isPriority ? 'Yes' : 'No'}</td>
                     <td>{auction.status}</td>
                     <td>
-                      {auction.status === 'pending' && (
+                      {(auction.status === 'pending' || auction.status === 'cancel_requested') && (
                         <>
                           <button className="approve-button" onClick={() => handleApprove(auction)}>Approve</button>
-                          <button className="reject-button" onClick={() => handleReject(auction.id)}>Reject</button>
+                          <button className="reject-button" onClick={() => handleReject(auction)}>
+                            {auction.status === 'cancel_requested' ? 'Approve Cancellation' : 'Reject'}
+                          </button>
                         </>
                       )}
                     </td>

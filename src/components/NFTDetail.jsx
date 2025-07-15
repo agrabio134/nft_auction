@@ -31,8 +31,11 @@ const suiClient = new SuiClient({ url: MAINNET_URL });
 // Clock ID
 const CLOCK_ID = '0x6';
 
-// Admin address
+// Admin address (for reference, not used for restricting actions)
 const ADMIN_ADDRESS = '0x3a74d8e94bf49bb738a3f1dedcc962ed01c89f78d21c01d87ee5e6980f0750e9';
+
+// Bored Toilet Club contract address
+const PROJECT_CONTRACT_ADDRESS = '0xe5baff56beb48aea00213139621d4f1f83a0665b9d401b715d3d4ba59fa282f8';
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -106,6 +109,8 @@ function NFTDetail() {
         type: nft?.nft?.nft_type || 'unknown',
         attributes: [],
         originalKioskId: null,
+        isOwned: false,
+        ownerInfo: null,
       });
       return;
     }
@@ -179,16 +184,57 @@ function NFTDetail() {
           const kioskOwnerCap = ownedObjects.data.find(obj => 
             obj.data?.content?.fields?.for === ownerInfo.ObjectOwner
           );
-          if (kioskOwnerCap || kioskObject?.data?.owner?.AddressOwner === wallet.account?.address) {
-            console.log('NFTDetail: Kiosk ownership verified');
+          if (kioskOwnerCap) {
+            console.log('NFTDetail: Kiosk ownership verified via KioskOwnerCap');
             isOwned = true;
+          }
+        } else if (ownerInfo?.ObjectOwner === PROJECT_CONTRACT_ADDRESS) {
+          console.log('NFTDetail: NFT is held by Bored Toilet Club contract:', PROJECT_CONTRACT_ADDRESS);
+          try {
+            const ownedObjects = await suiClient.getOwnedObjects({
+              owner: wallet.account?.address,
+              filter: { StructType: `${PROJECT_CONTRACT_ADDRESS}::boredtoilet::OwnershipCap` },
+              options: { showContent: true },
+            });
+            const isProjectOwner = ownedObjects.data.some(obj =>
+              obj.data?.content?.fields?.token_id === tokenId
+            );
+            if (isProjectOwner) {
+              console.log('NFTDetail: NFT ownership verified via Bored Toilet Club contract');
+              isOwned = true;
+            } else {
+              console.log('NFTDetail: No ownership proof found in Bored Toilet Club contract');
+              try {
+                const result = await suiClient.call({
+                  package: PROJECT_CONTRACT_ADDRESS,
+                  module: 'boredtoilet',
+                  function: 'get_owned_nfts',
+                  arguments: [wallet.account?.address],
+                  typeArguments: [],
+                });
+                const isFunctionOwner = result.some(nftId => nftId === tokenId);
+                if (isFunctionOwner) {
+                  console.log('NFTDetail: NFT ownership verified via contract function');
+                  isOwned = true;
+                }
+              } catch (functionErr) {
+                console.warn('NFTDetail: Failed to verify via contract function:', functionErr.message);
+                Sentry.captureException(functionErr);
+              }
+            }
+          } catch (err) {
+            console.warn('NFTDetail: Failed to verify project ownership:', err.message);
+            Sentry.captureException(err);
           }
         }
       }
 
-      if (!isOwned) {
-        console.warn('NFTDetail: Ownership not verified on-chain. Trusting GraphQL data.');
-        isOwned = true; // Trust GraphQL data from MyNFTGrid
+      if (!isOwned && originalKioskId) {
+        console.warn('NFTDetail: NFT is locked in a kiosk. Displaying with warning.');
+        setError(`This NFT is locked in a kiosk and cannot be listed. Please visit Tradeport to manage this NFT or contact the kiosk owner for assistance.`);
+      } else if (!isOwned) {
+        console.warn('NFTDetail: NFT not owned by wallet. Displaying with warning.');
+        setError(`This NFT is not owned by your wallet and cannot be listed. Please visit Tradeport to verify ownership or contact the current owner.`);
       }
 
       setNftDetails({
@@ -197,6 +243,8 @@ function NFTDetail() {
         type: nftObject.data.type || nft?.nft?.nft_type || 'unknown',
         attributes,
         originalKioskId,
+        isOwned,
+        ownerInfo,
       });
     } catch (err) {
       setError(`Failed to load NFT details: ${err.message}. Using basic data.`);
@@ -207,6 +255,8 @@ function NFTDetail() {
         type: nft?.nft?.nft_type || 'unknown',
         attributes: [],
         originalKioskId: null,
+        isOwned: false,
+        ownerInfo: null,
       });
     } finally {
       setIsLoading(false);
@@ -257,13 +307,15 @@ function NFTDetail() {
       setError('Please connect a wallet.');
       return;
     }
-    if (wallet.account?.address !== ADMIN_ADDRESS) {
-      setError('Only the admin wallet can apply to list NFTs.');
+    if (!nftDetails.isOwned) {
+      setError('This NFT is not owned by your wallet or is locked in a kiosk. Please visit Tradeport to verify ownership or contact the kiosk owner.');
       return;
     }
+    console.log('NFTDetail: Navigating to /apply with tokenId:', nft.nft.token_id);
     navigate('/apply', {
       state: {
         tokenId: nft.nft.token_id,
+        nftCollection: nftDetails.type,
       },
     });
   };
@@ -376,6 +428,50 @@ function NFTDetail() {
     }
   };
 
+  const handleWithdrawFromProject = async () => {
+    if (!wallet.connected || !wallet.signAndExecuteTransactionBlock) {
+      setError('Please connect a compatible wallet.');
+      return;
+    }
+    setIsUnlocking(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const tx = new TransactionBlock();
+      tx.moveCall({
+        target: `${PROJECT_CONTRACT_ADDRESS}::boredtoilet::withdraw_nft`,
+        arguments: [
+          tx.pure.id(nft.nft.token_id),
+          tx.pure(wallet.account?.address),
+        ],
+        typeArguments: [nftDetails.type],
+      });
+
+      const gasBudget = await estimateGasBudget(tx);
+      tx.setGasBudget(gasBudget);
+
+      const result = await wallet.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        requestType: 'WaitForLocalExecution',
+        options: { showEffects: true, showObjectChanges: true },
+        chain: 'sui:mainnet',
+      });
+
+      if (result.errors || result.effects?.status.status !== 'success') {
+        throw new Error(`Failed to withdraw NFT: ${JSON.stringify(result.errors || 'Transaction failed')}`);
+      }
+
+      setSuccess('NFT withdrawn from Bored Toilet Club contract successfully!');
+      fetchNftDetails(nft.nft.token_id); // Refresh details
+    } catch (err) {
+      setError(`Failed to withdraw NFT: ${err.message}.`);
+      Sentry.captureException(err);
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
   const handleRetry = () => {
     setError('');
     setSuccess('');
@@ -400,6 +496,8 @@ function NFTDetail() {
         type: nft?.nft?.nft_type || 'unknown',
         attributes: [],
         originalKioskId: null,
+        isOwned: false,
+        ownerInfo: null,
       });
     }
   }, [nft, fetchNftDetails]);
@@ -421,7 +519,6 @@ function NFTDetail() {
   }
 
   const tradeportUrl = `https://www.tradeport.xyz/sui/collection/${encodeURIComponent(nftDetails?.type || nft.nft?.nft_type || 'unknown')}?bottomTab=trades&tab=items&tokenId=${nft.nft.token_id}`;
-  const isAdminWallet = wallet.connected && wallet.account?.address === ADMIN_ADDRESS;
 
   return (
     <ErrorBoundary>
@@ -564,7 +661,7 @@ function NFTDetail() {
                         color="primary"
                         size="small"
                         onClick={handleApplyToList}
-                        disabled={isLoading || !nftDetails || !isAdminWallet}
+                        disabled={isLoading || !nftDetails || !nftDetails.isOwned}
                         sx={{ alignSelf: 'flex-start', px: 1.5, py: 0.5, fontSize: '0.8rem' }}
                       >
                         Apply to List
@@ -572,16 +669,30 @@ function NFTDetail() {
                     )}
                   </>
                 ) : (
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    size="small"
-                    onClick={handleApplyToList}
-                    disabled={isLoading || !nftDetails || !isAdminWallet}
-                    sx={{ alignSelf: 'flex-start', px: 1.5, py: 0.5, fontSize: '0.8rem' }}
-                  >
-                    Apply to List
-                  </Button>
+                  <>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      size="small"
+                      onClick={handleApplyToList}
+                      disabled={isLoading || !nftDetails || !nftDetails.isOwned}
+                      sx={{ alignSelf: 'flex-start', px: 1.5, py: 0.5, fontSize: '0.8rem' }}
+                    >
+                      Apply to List
+                    </Button>
+                    {nftDetails?.isOwned && nftDetails?.ownerInfo?.ObjectOwner === PROJECT_CONTRACT_ADDRESS && (
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        size="small"
+                        onClick={handleWithdrawFromProject}
+                        disabled={isUnlocking || isLoading}
+                        sx={{ alignSelf: 'flex-start', px: 1.5, py: 0.5, fontSize: '0.8rem', mt: 1 }}
+                      >
+                        {isUnlocking ? 'Withdrawing...' : 'Withdraw NFT from Project'}
+                      </Button>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Box>

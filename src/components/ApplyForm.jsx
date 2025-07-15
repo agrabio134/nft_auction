@@ -6,7 +6,7 @@ import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, addDoc, collection } from 'firebase/firestore';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { Box, Typography, TextField, Select, MenuItem, Button, Alert, Link } from '@mui/material';
+import { Box, Typography, TextField, Select, MenuItem, Button, Alert, Link, Checkbox, FormControlLabel, Modal, Paper, Tooltip } from '@mui/material';
 import * as Sentry from '@sentry/react';
 
 // Firebase configuration
@@ -32,10 +32,16 @@ const suiClient = new SuiClient({ url: MAINNET_URL });
 // Cache version for invalidation
 const CACHE_VERSION = 'v19';
 
-// Shared kiosk and admin details
-const SHARED_KIOSK_ID = '0x88411ccf93211de8e5f2a6416e4db21de4a0d69fc308a2a72e970ff05758a083';
-const KIOSK_OWNER_CAP_ID = '0x5c04a377c1e8c8c54c200db56083cc93eb46243ad4c2cf5b90c4aaef8500cfee';
+// Admin address
 const ADMIN_ADDRESS = '0x3a74d8e94bf49bb738a3f1dedcc962ed01c89f78d21c01d87ee5e6980f0750e9';
+
+// Move package ID
+const PACKAGE_ID = '0x192a27396fd86678ae2206651a3fcd2f75f14ac6adefadd51000df385ab55131';
+
+// LOFITA token configuration (static for now)
+const LOFITA_TOKEN_ADDRESS = '0xLOFITA_TOKEN_ADDRESS'; // Replace with actual LOFITA token address
+const TREASURY_ADDRESS = '0xTREASURY_ADDRESS'; // Replace with actual treasury address
+const LOFITA_AMOUNT = 100_000_000_000_000; // 100K LOFITA tokens (assuming 9 decimals)
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -70,12 +76,17 @@ function ApplyForm() {
   const [formData, setFormData] = useState({
     tokenId: prefilledTokenId || '',
     startingBid: '',
-    auctionDuration: '2',
+    auctionDuration: '8',
+    isPriority: false,
+    agreeTerms: false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [receiptData, setReceiptData] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [termsViewed, setTermsViewed] = useState(false);
   const hasCheckedTokenId = useRef(false);
 
   // Memoize prefilledTokenId
@@ -128,10 +139,20 @@ function ApplyForm() {
   // Handle wallet errors
   useEffect(() => {
     if (wallet.error) {
-      setError('Failed to connect wallet. Try Sui Wallet (https://chrome.google.com/webstore/detail/sui-wallet/opcgpfmipidbgpenhmajoajpbobppdil).');
+      setError('Failed to connect wallet. Try Sui Wallet.');
       Sentry.captureException(wallet.error);
     }
   }, [wallet.error]);
+
+  // Redirect after success and modal close
+  useEffect(() => {
+    if (success && !modalOpen) {
+      const timer = setTimeout(() => {
+        navigate('/history');
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [success, modalOpen, navigate]);
 
   // Estimate gas budget
   const estimateGasBudget = async (tx) => {
@@ -139,8 +160,8 @@ function ApplyForm() {
       const dryRun = await suiClient.dryRunTransactionBlock({ transactionBlock: tx });
       if (dryRun.effects.status.status === 'success') {
         const gasUsed = parseInt(dryRun.effects.gasUsed.computationCost) +
-                        parseInt(dryRun.effects.gasUsed.storageCost) -
-                        parseInt(dryRun.effects.gasUsed.storageRebate);
+          parseInt(dryRun.effects.gasUsed.storageCost) -
+          parseInt(dryRun.effects.gasUsed.storageRebate);
         return Math.max(gasUsed * 2, 200_000_000); // 0.2 SUI minimum
       }
       return 2_000_000_000; // 2 SUI fallback
@@ -149,6 +170,7 @@ function ApplyForm() {
     }
   };
 
+  // Check SUI balance
   const checkSuiBalance = async () => {
     try {
       const balance = await suiClient.getBalance({
@@ -165,6 +187,24 @@ function ApplyForm() {
     }
   };
 
+  // Check LOFITA balance
+  const checkLofitaBalance = async () => {
+    try {
+      const balance = await suiClient.getBalance({
+        owner: wallet.account?.address,
+        coinType: LOFITA_TOKEN_ADDRESS,
+      });
+      const totalBalance = parseInt(balance.totalBalance);
+      console.log('ApplyForm: LOFITA balance:', totalBalance);
+      return totalBalance >= LOFITA_AMOUNT;
+    } catch (err) {
+      setError(`Failed to check LOFITA balance: ${err.message}`);
+      Sentry.captureException(err);
+      return false;
+    }
+  };
+
+  // Fetch NFT object
   const fetchObjectId = async (tokenId, retry = false) => {
     if (!tokenId) {
       setError('No Token ID provided.');
@@ -231,14 +271,15 @@ function ApplyForm() {
     }
   };
 
+  // Validate kiosk
   const validateKiosk = async (kioskId, retry = false) => {
     try {
       const kioskObject = await suiClient.getObject({
         id: kioskId,
         options: { showContent: true, showType: true, showOwner: true },
       });
-      if (kioskObject.error || !kioskObject.data || kioskObject.data.type !== '0x2::kiosk::Kiosk' || !kioskObject.data.owner?.Shared) {
-        throw new Error(`Kiosk ${kioskId} is invalid or not shared.`);
+      if (kioskObject.error || !kioskObject.data || kioskObject.data.type !== '0x2::kiosk::Kiosk') {
+        throw new Error(`Kiosk ${kioskId} is invalid or not a kiosk.`);
       }
       const kioskFields = kioskObject.data.content?.fields;
       if (!kioskFields?.item_count && kioskFields.item_count !== 0) {
@@ -257,6 +298,7 @@ function ApplyForm() {
     }
   };
 
+  // Check kiosk status
   const checkKioskStatus = async (nftObjectId, kioskId) => {
     if (!kioskId) return null;
     const validation = await validateKiosk(kioskId, true);
@@ -278,7 +320,7 @@ function ApplyForm() {
           isInKiosk: true,
           isListed,
           isLocked,
-          message: `NFT is ${isListed ? 'listed' : 'locked'} in kiosk ${kioskId}. Withdraw it via TradePort (https://www.tradeport.xyz).`,
+          message: `NFT is ${isListed ? 'listed' : 'locked'} in kiosk ${kioskId}. Withdraw it via TradePort.`,
         };
       }
       return { isInKiosk: true };
@@ -290,9 +332,26 @@ function ApplyForm() {
   };
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+    if (name === 'agreeTerms' && !termsViewed) {
+      setError('Please read the Terms and Conditions before agreeing.');
+      return;
+    }
+    setFormData({
+      ...formData,
+      [name]: type === 'checkbox' ? checked : value,
+    });
     setError('');
     setSuccess('');
+  };
+
+  const handleTermsClick = () => {
+    setTermsViewed(true);
+    setError('');
+  };
+
+  const handleModalClose = () => {
+    setModalOpen(false);
   };
 
   const handleSubmit = async (e) => {
@@ -307,6 +366,10 @@ function ApplyForm() {
     }
     if (!formData.tokenId || !formData.startingBid) {
       setError('Token ID and Starting Bid are required.');
+      return;
+    }
+    if (!formData.agreeTerms) {
+      setError('You must agree to the Terms and Conditions.');
       return;
     }
     const startingBid = parseFloat(formData.startingBid);
@@ -346,13 +409,10 @@ function ApplyForm() {
         sourceKioskId = null;
       }
 
-      // Validate shared kiosk
-      const validation = await validateKiosk(SHARED_KIOSK_ID, true);
-      if (!validation.isValid) {
-        throw new Error(`Shared kiosk ${SHARED_KIOSK_ID} is invalid: ${validation.error}.`);
-      }
+      // Initialize transaction block
+      let tx = new TransactionBlock();
 
-      // If NFT is in another kiosk, withdraw it
+      // If NFT is in a kiosk, withdraw it
       if (isInKiosk && sourceKioskId) {
         const kioskOwnerCaps = await suiClient.getOwnedObjects({
           owner: wallet.account?.address || '',
@@ -365,7 +425,6 @@ function ApplyForm() {
 
         if (matchingCap) {
           const sourceKioskOwnerCapId = matchingCap.data?.objectId;
-          const tx = new TransactionBlock();
           const nft = tx.moveCall({
             target: `0x2::kiosk::take`,
             arguments: [
@@ -376,49 +435,33 @@ function ApplyForm() {
             typeArguments: [nftCollection],
           });
           tx.transferObjects([nft], wallet.account?.address);
-
-          const gasBudget = await estimateGasBudget(tx);
-          tx.setGasBudget(gasBudget);
-          const takeResult = await wallet.signAndExecuteTransactionBlock({
-            transactionBlock: tx,
-            requestType: 'WaitForLocalExecution',
-            options: { showObjectChanges: true, showEffects: true },
-            chain: 'sui:mainnet',
-          });
-          if (takeResult.errors) {
-            throw new Error(`Failed to withdraw NFT from kiosk ${sourceKioskId}: ${JSON.stringify(takeResult.errors)}. Withdraw via TradePort (https://www.tradeport.xyz).`);
-          }
-          console.log('ApplyForm: Withdrew NFT from kiosk, proceeding as directly owned');
-          isInKiosk = false;
         } else {
-          throw new Error(`You do not own the KioskOwnerCap for kiosk ${sourceKioskId}. Withdraw via TradePort (https://www.tradeport.xyz).`);
+          throw new Error(`You do not own the KioskOwnerCap for kiosk ${sourceKioskId}. Withdraw via TradePort.`);
         }
       }
 
-      // Place NFT in shared kiosk
-      if (!isInKiosk || sourceKioskId !== SHARED_KIOSK_ID) {
-        let placeTx = new TransactionBlock();
-        placeTx.moveCall({
-          target: `0x2::kiosk::place`,
-          arguments: [
-            placeTx.object(SHARED_KIOSK_ID),
-            placeTx.object(KIOSK_OWNER_CAP_ID),
-            placeTx.object(nftObjectId),
-          ],
+      // Deposit NFT to admin address
+      if (!isInKiosk) {
+        tx.moveCall({
+          target: `${PACKAGE_ID}::marketplace::deposit_nft_to_admin`,
+          arguments: [tx.object(nftObjectId)],
           typeArguments: [nftCollection],
         });
-        const gasBudget = await estimateGasBudget(placeTx);
-        placeTx.setGasBudget(gasBudget);
-        const placeResult = await wallet.signAndExecuteTransactionBlock({
-          transactionBlock: placeTx,
-          requestType: 'WaitForLocalExecution',
-          options: { showObjectChanges: true, showEffects: true },
-          chain: 'sui:mainnet',
-        });
-        if (placeResult.errors) {
-          throw new Error(`Failed to place NFT in shared kiosk: ${JSON.stringify(placeResult.errors)}.`);
-        }
       }
+
+      // Execute transaction
+      const gasBudget = await estimateGasBudget(tx);
+      tx.setGasBudget(gasBudget);
+      const depositResult = await wallet.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+        requestType: 'WaitForLocalExecution',
+        options: { showObjectChanges: true, showEffects: true },
+        chain: 'sui:mainnet',
+      });
+      if (depositResult.errors) {
+        throw new Error(`Failed to process transaction: ${JSON.stringify(depositResult.errors)}.`);
+      }
+      console.log('ApplyForm: Transaction executed, deposited NFT to admin address:', ADMIN_ADDRESS);
 
       // Submit to Firestore
       const applicationData = {
@@ -431,19 +474,31 @@ function ApplyForm() {
         nftObjectId,
         collection: nftCollection,
         name,
-        kioskId: SHARED_KIOSK_ID,
-        kioskOwnerCapId: KIOSK_OWNER_CAP_ID,
+        transferredTo: ADMIN_ADDRESS,
+        isPriority: formData.isPriority,
+        receiptId: `REC-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       };
       try {
-        await addDoc(collection(db, 'auctions'), applicationData);
-        setSuccess('NFT submitted for auction approval!');
+        const docRef = await addDoc(collection(db, 'auctions'), applicationData);
+        setReceiptData({
+          receiptId: applicationData.receiptId,
+          tokenId: formData.tokenId,
+          startingBid: startingBid,
+          auctionDuration: applicationData.auctionDuration,
+          isPriority: formData.isPriority,
+          submittedAt: applicationData.submittedAt,
+          seller: applicationData.seller,
+          name: applicationData.name,
+        });
+        setModalOpen(true);
+        setSuccess(`NFT submitted for auction approval! Receipt ID: ${applicationData.receiptId}`);
       } catch (firestoreErr) {
         setError(`Failed to save auction data: ${firestoreErr.message}.`);
         Sentry.captureException(firestoreErr);
       }
-      setFormData({ tokenId: '', startingBid: '', auctionDuration: '2' });
+      setFormData({ tokenId: '', startingBid: '', auctionDuration: '2', isPriority: false, agreeTerms: false });
     } catch (err) {
-      setError(`Failed to submit application: ${err.message}. If the issue persists, withdraw on TradePort (https://www.tradeport.xyz).`);
+      setError(`Failed to submit application: ${err.message}. If the issue persists, contact support.`);
       Sentry.captureException(err);
     } finally {
       setIsSubmitting(false);
@@ -531,7 +586,7 @@ function ApplyForm() {
           </Box>
           <Box>
             <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', mb: 0.5, fontSize: '0.8rem' }}>
-              Auction Duration (Hours)
+              Auction Duration
             </Typography>
             <Select
               fullWidth
@@ -547,11 +602,57 @@ function ApplyForm() {
                 borderRadius: 1,
               }}
             >
-              <MenuItem value="2">2 Hours</MenuItem>
-              <MenuItem value="4">4 Hours</MenuItem>
               <MenuItem value="8">8 Hours</MenuItem>
+              <MenuItem value="12">12 Hours</MenuItem>
               <MenuItem value="24">24 Hours</MenuItem>
+              <MenuItem value="48">2 Days</MenuItem>
+              <MenuItem value="72">3 Days</MenuItem>
+              <MenuItem value="120">5 Days</MenuItem>
+              <MenuItem value="168">1 Week</MenuItem>
             </Select>
+          </Box>
+          <Box>
+            <Tooltip title="*FREE LISTING until July 20, 2025">
+              <span>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      name="isPriority"
+                      checked={formData.isPriority}
+                      disabled={true}
+                      size="small"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'text.primary' }}>
+                      Priority Listing (Requires 100K LOFITA tokens)
+                    </Typography>
+                  }
+                />
+              </span>
+            </Tooltip>
+          </Box>
+          <Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  name="agreeTerms"
+                  checked={formData.agreeTerms}
+                  onChange={handleChange}
+                  disabled={!wallet.connected}
+                  size="small"
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'text.primary' }}>
+                  I agree to the{' '}
+                  <Link href="/terms" target="_blank" rel="noopener noreferrer" onClick={handleTermsClick}>
+                    Terms and Conditions
+                  </Link>
+                  . The NFT will be transferred to a sharable admin kiosk.
+                </Typography>
+              }
+            />
           </Box>
           {error && (
             <Alert severity="error" sx={{ fontSize: '0.7rem', mt: 1 }}>
@@ -568,7 +669,7 @@ function ApplyForm() {
               type="submit"
               variant="contained"
               color="primary"
-              disabled={isSubmitting || !isAuthenticated || !formData.tokenId}
+              disabled={isSubmitting || !isAuthenticated || !formData.tokenId || !formData.agreeTerms}
               sx={{ alignSelf: 'center', px: 2, py: 0.5, fontSize: '0.8rem', mt: 1 }}
             >
               {isSubmitting ? 'Submitting...' : 'Apply to List'}
@@ -594,6 +695,74 @@ function ApplyForm() {
             </Box>
           )}
         </Box>
+        <Modal
+          open={modalOpen}
+          onClose={handleModalClose}
+          aria-labelledby="receipt-modal-title"
+          sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Paper
+            sx={{
+              maxWidth: 400,
+              p: 3,
+              bgcolor: 'background.paper',
+              borderRadius: 2,
+              boxShadow: 24,
+              textAlign: 'center',
+            }}
+          >
+            <Typography
+              id="receipt-modal-title"
+              variant="h6"
+              sx={{ fontFamily: '"Poppins", "Roboto", sans-serif', fontWeight: 700, mb: 2 }}
+            >
+              Auction Submission Receipt
+            </Typography>
+            {receiptData && (
+              <Box sx={{ textAlign: 'left', mb: 2 }}>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 1 }}>
+                  <strong>Receipt ID:</strong> {receiptData.receiptId}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 1 }}>
+                  <strong>NFT Name:</strong> {receiptData.name}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 1 }}>
+                  <strong>Token ID:</strong> {receiptData.tokenId.slice(0, 6)}...{receiptData.tokenId.slice(-6)}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 1 }}>
+                  <strong>Starting Bid:</strong> {receiptData.startingBid.toFixed(2)} SUI
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 1 }}>
+                  <strong>Auction Duration:</strong> {receiptData.auctionDuration} Hours
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 1 }}>
+                  <strong>Priority Listing:</strong> {receiptData.isPriority ? 'Yes' : 'No'}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 1 }}>
+                  <strong>Submitted At:</strong> {new Date(receiptData.submittedAt).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: 'numeric',
+                    hour12: true,
+                  })}
+                </Typography>
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', mb: 1 }}>
+                  <strong>Seller Address:</strong> {receiptData.seller.slice(0, 6)}...{receiptData.seller.slice(-6)}
+                </Typography>
+              </Box>
+            )}
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleModalClose}
+              sx={{ fontSize: '0.8rem', px: 2, py: 0.5 }}
+            >
+              Close
+            </Button>
+          </Paper>
+        </Modal>
       </Box>
     </ErrorBoundary>
   );

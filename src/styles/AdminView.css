@@ -36,7 +36,7 @@
   background: rgba(255, 255, 255, 0.03);
   border-radius: 0.75rem;
   border: 1px solid #ff4da6;
-  overflow: hidden;
+    overflow-x: auto;
 }
 
 .auctions-table th,
@@ -270,7 +270,14 @@
   box-shadow: 0 4px 12px rgba(255, 0, 122, 0.3);
   animation: fadeIn 0.3s ease;
 }
-
+  .auctions-table {
+    display: block;
+    overflow-x: auto;
+    /* white-space: nowrap; */
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #ff4da6 rgba(255, 255, 255, 0.1);
+  }
 @keyframes slideIn {
   from {
     transform: translateX(100%);
@@ -315,14 +322,7 @@
     font-size: 1.5rem;
   }
 
-  .auctions-table {
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: #ff4da6 rgba(255, 255, 255, 0.1);
-  }
+s
 
   .auctions-table::-webkit-scrollbar {
     height: 8px;

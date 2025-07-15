@@ -12,7 +12,7 @@ const client = new ApolloClient({
   uri: 'https://api.indexer.xyz/graphql',
   cache: new InMemoryCache(),
   headers: {
-    'x-api-key': 'dy3hRpp.cd7fef04eb74666815f15fac06980c27',
+    'x-api-key': 'MOj0BYW.dcb1aea8f883c19721b75304d78631de',
     'x-api-user': 'lofita'
   }
 });

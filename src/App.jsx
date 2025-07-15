@@ -29,10 +29,12 @@ import ApplyForm from './components/ApplyForm';
 import AdminView from './components/AdminView';
 import NFTDetail from './components/NFTDetail';
 import LiveAuction from './components/LiveAuction';
-import '@suiet/wallet-kit/style.css'; // Default SUI Wallet Kit CSS
-import './suiet-wallet-kit-custom.css'; // Custom CSS
+import History from './components/History';
+import Terms from './components/Terms';
+import '@suiet/wallet-kit/style.css';
+import './suiet-wallet-kit-custom.css';
 
-const isMaintenance = 1; // Updated to 3 for MAINNET public test completion
+const isMaintenance = 0;
 
 // GraphQL Queries
 const FETCH_COLLECTIONS = gql`
@@ -347,6 +349,12 @@ function App() {
     setFilteredData([]);
   };
 
+  const handleHistory = () => {
+    setActiveFilter('history');
+    setSelectedCollection(null);
+    setFilteredData([]);
+  };
+
   const handleAdmin = () => {
     if (!isAdmin) {
       alert('You do not have admin access.');
@@ -365,6 +373,8 @@ function App() {
     { label: 'Live Auction', onClick: handleAuctions, to: '/' },
     { label: 'Collections', onClick: handleCollections, to: '/collections' },
     { label: 'My NFTs', onClick: handleMyNfts, to: '/my-nfts' },
+    // { label: 'Apply', onClick: handleApply, to: '/apply' },
+    { label: 'History', onClick: handleHistory, to: '/history' },
     { label: 'Admin', onClick: handleAdmin, to: '/admin' },
   ];
 
@@ -435,7 +445,6 @@ function App() {
             }}
           >
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              {/* Drawer Header */}
               <Box
                 sx={{
                   p: 2,
@@ -458,8 +467,6 @@ function App() {
                   <MenuIcon />
                 </IconButton>
               </Box>
-
-              {/* Navigation Items */}
               <List sx={{ flexGrow: 1, p: 1 }}>
                 {navItems.map((item) => (
                   <ListItem
@@ -500,8 +507,6 @@ function App() {
                   </ListItem>
                 ))}
               </List>
-
-              {/* Footer Section */}
               <Box
                 sx={{
                   p: 2,
@@ -518,7 +523,6 @@ function App() {
               </Box>
             </Box>
           </Drawer>
-
           <Container sx={{ py: { xs: 2, md: 3 }, maxWidth: 'lg' }}>
             <Routes>
               <Route
@@ -592,6 +596,8 @@ function App() {
               />
               <Route path="/my-nfts" element={<MyNFTGrid nfts={filteredData} />} />
               <Route path="/apply" element={<ApplyForm />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/terms" element={<Terms />} />
               <Route path="/admin" element={isAdmin ? <AdminView /> : <Alert severity="error" sx={{ maxWidth: 500, mx: 'auto', bgcolor: 'background.paper' }}>You do not have admin access.</Alert>} />
               <Route path="/nft/:collectionId/:tokenId" element={<NFTDetail />} />
             </Routes>
@@ -602,7 +608,6 @@ function App() {
   );
 }
 
-// New Component for Collection NFTs
 function CollectionNFTs({ collections }) {
   const { slug } = useParams();
   const navigate = useNavigate();
